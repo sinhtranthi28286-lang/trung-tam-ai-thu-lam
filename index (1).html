@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trung tâm AI - Ban Xây dựng Đảng xã Thư Lâm v3.0</title>
+<style>
+:root{--red:#8b1e1e;--red2:#a52a2a;--bg:#f4f6f9;--line:#e3e7ed;--text:#1f2937;--muted:#687386}
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(135deg,#7f1d1d,#a52a2a);color:#fff;padding:25px 18px}
+.head{max-width:1220px;margin:auto}.head h1{margin:0;font-size:29px}.head p{margin:8px 0 0;opacity:.92}
+.wrap{max-width:1220px;margin:20px auto;padding:0 15px}
+.notice{background:#fff;border:1px solid var(--line);border-left:5px solid var(--red);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.area-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px;margin-bottom:16px}
+.area{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;min-height:86px}
+.area:hover,.area.active{border-color:var(--red);background:#fff8f8}.area b{display:block;color:var(--red);margin-bottom:5px}.area small{color:var(--muted)}
+.main{display:grid;grid-template-columns:310px 1fr;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 3px 12px rgba(0,0,0,.04)}
+h2{margin:0 0 13px;color:var(--red);font-size:20px}.tasks button{width:100%;text-align:left;background:#fff;border:1px solid #d9dee7;border-radius:9px;padding:11px;margin:5px 0;cursor:pointer}
+.tasks button:hover,.tasks button.active{border-color:var(--red);background:#fff5f5;color:var(--red)}
+.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{background:#fff1f2;color:#9f1239;border-radius:999px;padding:5px 9px;font-size:12px}
+.desc{color:var(--muted);margin:5px 0 14px}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.step{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:11px;font-size:13px}.step b{display:block;color:var(--red);margin-bottom:4px}
+.resource{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:13px 0}
+.res{border:1px solid var(--line);border-radius:11px;padding:13px;background:#fcfcfd}.res h3{font-size:15px;margin:0 0 6px;color:#374151}.res p{font-size:13px;color:var(--muted);margin:0 0 9px}
+.btn{border:0;border-radius:9px;padding:10px 13px;font-weight:700;cursor:pointer;margin:4px 5px 4px 0}.primary{background:var(--red);color:#fff}.dark{background:#374151;color:#fff}.light{background:#eef1f5;color:#1f2937}
+textarea{width:100%;min-height:205px;border:1px solid #d7dce4;border-radius:10px;padding:12px;background:#fbfcfd;resize:vertical}
+.library{margin-top:16px}.libgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.lib{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}.lib b{color:var(--red)}.lib p{font-size:13px;color:var(--muted);min-height:32px}
+footer{text-align:center;color:#7b8492;padding:24px;font-size:13px}
+@media(max-width:900px){.main{grid-template-columns:1fr}.flow,.resource{grid-template-columns:1fr}}
+</style>
+
+<style>
+#warehouseModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;padding:20px;overflow:auto}
+#warehouseModal .modalbox{max-width:1050px;margin:20px auto;background:#fff;border-radius:14px;padding:20px}
+#warehouseModal .close{float:right;background:#374151;color:#fff;border:0;border-radius:8px;padding:9px 12px;cursor:pointer}
+.whgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;clear:both;padding-top:12px}
+.whitem{border:1px solid #e3e7ed;border-radius:10px;padding:13px;background:#fafafa}
+.whitem h3{margin:0 0 7px;color:#8b1e1e;font-size:16px}
+</style>
+</head>
+<body>
+<header><div class="head">
+<h1>TRUNG TÂM AI – BAN XÂY DỰNG ĐẢNG XÃ THƯ LÂM</h1>
+<p>Nghiệp vụ số • Biểu mẫu • Công cụ AI • Kho tài liệu dùng chung</p>
+</div></header>
+
+<div class="wrap">
+<div class="notice"><b>Bản chính thức 1.0:</b> Trung tâm AI là cổng hỗ trợ nghiệp vụ dùng chung của Ban Xây dựng Đảng xã Thư Lâm, tích hợp nhóm công việc, câu lệnh AI chuẩn, kho nghiệp vụ số, biểu mẫu và công cụ hỗ trợ. <b>AI chỉ hỗ trợ; cán bộ phải kiểm tra kết quả trước khi sử dụng chính thức.</b></div>
+
+<div class="area-grid" id="areas"></div>
+
+
+<div class="card" style="margin-bottom:16px">
+  <h2>Hướng dẫn sử dụng nhanh</h2>
+  <div class="flow">
+    <div class="step"><b>① Chọn lĩnh vực</b>Chọn nhóm nghiệp vụ phù hợp với công việc đang xử lý.</div>
+    <div class="step"><b>② Chọn công việc</b>Trung tâm tự hiển thị câu lệnh AI chuẩn và tài liệu/biểu mẫu liên quan.</div>
+    <div class="step"><b>③ Thực hiện và kiểm tra</b>Mở nền tảng AI, đính kèm tài liệu, sử dụng câu lệnh và rà soát kết quả trước khi trình.</div>
+  </div>
+  <div style="margin-top:10px;padding:12px;background:#fff8f8;border:1px solid #f2caca;border-radius:10px;font-size:13px">
+    <b>Lưu ý về dữ liệu:</b> Không đưa tài liệu mật, thông tin thuộc phạm vi hạn chế tiếp cận hoặc dữ liệu không được phép chia sẻ lên nền tảng AI công cộng. Không coi kết quả AI là căn cứ thay thế văn bản, hồ sơ gốc hoặc ý kiến của người có thẩm quyền.
+  </div>
+</div>
+
+<div class="main">
+  <div class="card">
+    <h2>Danh mục công việc</h2>
+    <div class="tasks" id="tasks"></div>
+  </div>
+
+  <div class="card">
+    <div class="topline"><div><h2 id="title">Chọn công việc</h2><div class="desc" id="desc"></div></div><span class="badge">AI + NGHIỆP VỤ</span></div>
+    <div class="flow">
+      <div class="step"><b>① Chọn công việc</b>Chọn đúng nghiệp vụ đang thực hiện.</div>
+      <div class="step"><b>② Lấy mẫu/tài liệu</b>Mở mẫu hoặc kho tài liệu liên quan nếu cần.</div>
+      <div class="step"><b>③ Xử lý bằng AI</b>Mở nền tảng AI, tải tài liệu và dùng câu lệnh chuẩn.</div>
+    </div>
+
+    <div class="resource">
+      <div class="res">
+        <h3>📄 Biểu mẫu nghiệp vụ</h3>
+        <p id="templateText">Chọn công việc để xem biểu mẫu gợi ý.</p>
+        <button class="btn light" onclick="openWarehouse()">Mở mẫu / thư mục mẫu</button>
+      </div>
+      <div class="res">
+        <h3>📚 Tài liệu tham khảo</h3>
+        <p id="docText">Chọn công việc để xem nhóm tài liệu liên quan.</p>
+        <button class="btn light" onclick="openWarehouse()">Mở kho tài liệu</button>
+      </div>
+    </div>
+
+    <h2 style="font-size:17px;margin-top:15px">Câu lệnh AI chuẩn</h2>
+    <textarea id="prompt" readonly>Chọn một công việc ở bên trái.</textarea>
+    <div>
+      <button class="btn primary" onclick="copyPrompt()">Sao chép câu lệnh</button>
+      <button class="btn dark" onclick="ai('https://chatgpt.com/')">ChatGPT</button>
+      <button class="btn light" onclick="ai('https://copilot.microsoft.com/')">Copilot</button>
+      <button class="btn light" onclick="ai('https://gemini.google.com/')">Gemini</button>
+    </div>
+    <div class="desc">Kho nghiệp vụ số được tích hợp ngay trong file này, không cần giải nén hay mở thêm file HTML khác.</div>
+  </div>
+</div>
+
+<div class="card library">
+<h2>Kho nghiệp vụ số Thư Lâm</h2>
+<div class="libgrid">
+<div class="lib"><b>01. Kho biểu mẫu</b><p>Tờ trình, quyết định, thông báo, danh sách, phiếu, biên bản, biểu Excel.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>02. Kho văn bản</b><p>Quy định, hướng dẫn, kế hoạch, công văn và văn bản nghiệp vụ thường dùng.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>03. Công cụ Excel</b><p>Theo dõi cán bộ, nâng lương, đào tạo, nhiệm vụ, số liệu báo cáo.</p><button class="btn light" onclick="openWarehouse()">Mở công cụ</button></div>
+<div class="lib"><b>04. Báo cáo mẫu</b><p>Các báo cáo đã hoàn thiện để tham khảo cấu trúc và cách trình bày.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>05. Hướng dẫn AI</b><p>Nguyên tắc sử dụng, kiểm tra kết quả và bảo vệ dữ liệu khi dùng AI.</p><button class="btn light" onclick="openWarehouse()">Xem hướng dẫn</button></div>
+</div>
+</div>
+</div>
+
+
+<div class="wrap">
+<div class="card" style="margin-top:16px">
+<h2>Thông tin sản phẩm</h2>
+<p style="margin:6px 0"><b>Tên sản phẩm:</b> Trung tâm AI – Ban Xây dựng Đảng xã Thư Lâm.</p>
+<p style="margin:6px 0"><b>Mục đích:</b> Chuẩn hóa và hỗ trợ cán bộ khai thác AI trong thực hiện nhiệm vụ chuyên môn; tập trung nghiệp vụ, câu lệnh mẫu, biểu mẫu và tài liệu dùng chung tại một đầu mối.</p>
+<p style="margin:6px 0"><b>Phạm vi:</b> Công cụ hỗ trợ nội bộ; không thay thế quy trình nghiệp vụ, văn bản quy định hoặc trách nhiệm kiểm tra của cán bộ chuyên môn.</p>
+</div>
+</div>
+
+<footer>Trung tâm AI – Ban Xây dựng Đảng xã Thư Lâm | Bản chính thức 1.0</footer>
+
+<script>
+const D={
+"Công tác cán bộ":[
+["Soạn tờ trình","Mẫu Tờ trình công tác cán bộ","Quy định/quy trình công tác cán bộ","Đọc toàn bộ tài liệu tôi cung cấp và soạn dự thảo tờ trình về công tác cán bộ. Giữ đúng nội dung nguồn; không tự bổ sung căn cứ, số liệu, tên người, chức vụ hoặc mốc thời gian. Nội dung thiếu ghi [CẦN BỔ SUNG], nội dung chưa thống nhất ghi [CẦN KIỂM TRA]. Văn phong hành chính, ngắn gọn, rõ ràng."],
+["Kiểm tra hồ sơ cán bộ","Checklist hồ sơ cán bộ","Quy trình và thành phần hồ sơ","Đọc toàn bộ hồ sơ tôi cung cấp và lập bảng: Thành phần hồ sơ | Đã có/Chưa có | Nội dung cần kiểm tra | Ghi chú. Không tự suy diễn. Cuối cùng liệt kê các nội dung cần hoàn thiện trước khi trình."],
+["Rà soát danh sách cán bộ","Mẫu danh sách/trích ngang Excel","Hồ sơ, danh sách nguồn","Đối chiếu các danh sách tôi cung cấp. Phát hiện sai khác về họ tên, ngày sinh, chức vụ, đơn vị, trình độ, hệ số và mốc thời gian. Lập bảng đối chiếu; không tự sửa dữ liệu."],
+["Tổng hợp báo cáo cán bộ","Mẫu báo cáo công tác cán bộ","Báo cáo kỳ trước và số liệu nguồn","Tổng hợp tài liệu tôi cung cấp thành dự thảo báo cáo công tác cán bộ. Loại trùng lặp, ưu tiên kết quả và số liệu; mâu thuẫn ghi [CẦN KIỂM TRA], thiếu dữ liệu ghi [CẦN BỔ SUNG]."],
+["Soạn thông báo chủ trương","Mẫu Thông báo chủ trương","Hồ sơ đề nghị và quy trình cán bộ","Căn cứ hồ sơ tôi cung cấp, soạn dự thảo thông báo chủ trương. Không tự bổ sung nhân sự, chức danh, thời gian hoặc căn cứ. Nội dung thiếu ghi [CẦN BỔ SUNG]."],
+["Soạn quyết định","Mẫu Quyết định","Tờ trình, thông báo, hồ sơ đã được duyệt","Soạn dự thảo quyết định từ hồ sơ tôi cung cấp. Kiểm tra chặt chẽ họ tên, chức vụ, đơn vị, thời gian và căn cứ; không tự tạo thông tin."],
+["Soạn phiếu biểu quyết/biên bản kiểm phiếu","Mẫu phiếu và biên bản kiểm phiếu","Danh sách nhân sự và kết quả biểu quyết","Căn cứ tài liệu tôi cung cấp, chuẩn hóa nội dung phiếu biểu quyết hoặc biên bản kiểm phiếu. Không tự tạo số phiếu hoặc kết quả."],
+["Rà soát điều kiện, tiêu chuẩn","Mẫu bảng rà soát tiêu chuẩn","Quy định tiêu chuẩn + hồ sơ cán bộ","Đối chiếu hồ sơ cán bộ với tiêu chuẩn trong tài liệu cung cấp. Lập bảng: Tiêu chuẩn | Hồ sơ thể hiện | Đạt/Chưa đủ căn cứ | Nội dung cần bổ sung. Không tự kết luận khi thiếu dữ liệu."],
+["Theo dõi nâng lương","Mẫu bảng nâng lương Excel","Danh sách, quyết định lương, quy định liên quan","Rà soát dữ liệu nâng lương, xác định các trường hợp đến hạn theo thông tin và quy định tôi cung cấp. Nêu rõ cách đối chiếu; trường hợp thiếu dữ liệu ghi [CẦN KIỂM TRA]."],
+["Tổng hợp quy hoạch/đào tạo cán bộ","Mẫu bảng tổng hợp cán bộ","Danh sách quy hoạch, đào tạo, bồi dưỡng","Tổng hợp dữ liệu quy hoạch, đào tạo, bồi dưỡng cán bộ theo từng nhóm; phát hiện trùng lặp và thông tin chưa thống nhất."],
+["So sánh hồ sơ trước và sau cập nhật","Mẫu bảng đối chiếu","Hai phiên bản hồ sơ/danh sách","So sánh hai phiên bản hồ sơ hoặc danh sách cán bộ, chỉ ra toàn bộ nội dung thay đổi, bổ sung, mất đi hoặc chưa thống nhất."]
+],
+"Tổ chức cơ sở đảng":[
+["Tạo checklist quy trình","Mẫu checklist quy trình","Quy định/hướng dẫn tổ chức cơ sở đảng","Căn cứ tài liệu tôi cung cấp, tạo checklist từng bước thực hiện gồm: Việc phải làm | Chủ thể | Hồ sơ/sản phẩm | Thời điểm | Lưu ý. Không bổ sung bước không có căn cứ."],
+["Soạn báo cáo TCCSĐ","Mẫu báo cáo TCCSĐ","Báo cáo, số liệu tổ chức đảng","Tổng hợp tài liệu thành dự thảo báo cáo tổ chức cơ sở đảng; ưu tiên số liệu, kết quả kiện toàn, sinh hoạt, khó khăn và kiến nghị. Không tự tạo thông tin."],
+["Tóm tắt hướng dẫn","Mẫu phiếu tóm tắt văn bản","Văn bản hướng dẫn hiện hành","Tóm tắt tài liệu theo: đối tượng, nội dung chính, thẩm quyền, quy trình, hồ sơ, thời hạn và việc cấp xã cần thực hiện. Không suy diễn ngoài tài liệu."],
+["Soạn tờ trình kiện toàn tổ chức đảng","Mẫu Tờ trình","Quy định + hồ sơ tổ chức đảng","Soạn dự thảo tờ trình kiện toàn tổ chức đảng từ tài liệu cung cấp; không tự bổ sung nhân sự, số lượng hoặc căn cứ."],
+["Soạn quyết định thành lập/kiện toàn","Mẫu Quyết định","Tờ trình và hồ sơ được duyệt","Soạn dự thảo quyết định thành lập hoặc kiện toàn tổ chức đảng theo hồ sơ cung cấp; rà soát tên tổ chức, nhân sự và thời điểm."],
+["Rà soát mô hình tổ chức đảng","Mẫu bảng rà soát","Danh sách tổ chức đảng + quy định","Đối chiếu danh sách tổ chức đảng với quy định cung cấp, lập bảng các trường hợp cần kiện toàn hoặc kiểm tra thêm."],
+["Chuẩn bị nội dung sinh hoạt chi bộ","Mẫu chương trình sinh hoạt","Hướng dẫn sinh hoạt + tài liệu tháng","Từ tài liệu cung cấp, xây dựng gợi ý chương trình và nội dung sinh hoạt chi bộ; phân biệt nội dung thường kỳ và chuyên đề nếu có căn cứ."],
+["Kiểm tra biên bản sinh hoạt","Mẫu biên bản","Biên bản sinh hoạt + hướng dẫn","Rà soát biên bản sinh hoạt chi bộ về thành phần, nội dung, trình tự, kết luận và các thông tin còn thiếu. Không tự bổ sung nội dung cuộc họp."],
+["Tổng hợp tình hình sinh hoạt chi bộ","Mẫu bảng tổng hợp","Báo cáo/biên bản các chi bộ","Tổng hợp tình hình sinh hoạt chi bộ theo tài liệu cung cấp; nêu số lượng, kết quả, tồn tại và trường hợp cần kiểm tra."],
+["So sánh quy định tổ chức đảng","Mẫu bảng so sánh","Văn bản cũ và mới","So sánh hai văn bản về tổ chức cơ sở đảng, lập bảng nội dung cũ | nội dung mới | điểm thay đổi | việc cần thực hiện."]
+],
+"Công tác đảng viên":[
+["Tổng hợp số liệu đảng viên","Mẫu bảng tổng hợp đảng viên","Danh sách và báo cáo đảng viên","Tổng hợp số liệu đảng viên theo từng nhóm. Tính tổng/tỷ lệ khi đủ căn cứ; không cộng dữ liệu có nguy cơ trùng. Chênh lệch ghi [CẦN KIỂM TRA]."],
+["Kiểm tra danh sách đảng viên","Mẫu danh sách rà soát","Danh sách đảng viên nguồn","Đối chiếu danh sách, phát hiện trùng, thiếu hoặc sai khác họ tên, ngày sinh, chi bộ, trạng thái sinh hoạt. Lập bảng cảnh báo; không tự sửa."],
+["Soạn báo cáo đảng viên","Mẫu báo cáo đảng viên","Số liệu và báo cáo kỳ trước","Soạn dự thảo báo cáo công tác đảng viên từ tài liệu cung cấp; văn phong hành chính, ưu tiên số liệu, không tự tạo dữ liệu."],
+["Rà soát hồ sơ kết nạp","Checklist hồ sơ kết nạp","Hồ sơ kết nạp + hướng dẫn","Kiểm tra thành phần và thông tin trong hồ sơ kết nạp đảng viên theo tài liệu hướng dẫn cung cấp; lập checklist đủ/thiếu/cần kiểm tra."],
+["Rà soát hồ sơ chuyển chính thức","Checklist chuyển chính thức","Hồ sơ đảng viên dự bị + hướng dẫn","Rà soát hồ sơ đề nghị công nhận đảng viên chính thức; chỉ ra thành phần thiếu, thông tin chưa thống nhất và nội dung cần bổ sung."],
+["Theo dõi chuyển sinh hoạt đảng","Mẫu bảng theo dõi","Danh sách chuyển đi/chuyển đến","Tổng hợp và đối chiếu tình hình chuyển sinh hoạt đảng; phát hiện trường hợp thiếu thông tin, trùng hoặc chưa hoàn tất."],
+["Tổng hợp nhận xét nơi cư trú","Mẫu bảng tổng hợp","Danh sách/phiếu nhận xét","Tổng hợp số lượng và tình trạng nhận xét đảng viên nơi cư trú; không tự đánh giá nội dung cá nhân khi tài liệu không đủ căn cứ."],
+["Rà soát đảng viên theo chi bộ","Mẫu danh sách chi bộ","Danh sách đảng viên nhiều nguồn","Phân nhóm đảng viên theo chi bộ và đối chiếu giữa các nguồn; chỉ ra chênh lệch về số lượng hoặc thông tin."],
+["Tạo danh sách cần bổ sung dữ liệu","Mẫu danh sách rà soát","Cơ sở dữ liệu/danh sách đảng viên","Xác định các trường hợp còn thiếu trường thông tin cần thiết trong dữ liệu cung cấp; lập danh sách để cán bộ bổ sung."],
+["Tổng hợp biến động đảng viên","Mẫu biểu biến động","Dữ liệu đầu kỳ/cuối kỳ","So sánh dữ liệu đầu kỳ và cuối kỳ, tổng hợp tăng, giảm, chuyển đi, chuyển đến và các biến động khác có căn cứ trong tài liệu."]
+],
+"BVCTNB":[
+["Rà soát hồ sơ","Mẫu phiếu rà soát","Tài liệu/hướng dẫn BVCTNB","Hệ thống hóa hồ sơ tôi cung cấp, chỉ ra thông tin còn thiếu hoặc chưa thống nhất. Không đưa ra kết luận thay cơ quan có thẩm quyền."],
+["Tóm tắt hồ sơ thẩm định","Mẫu phiếu tóm tắt","Hồ sơ nguồn","Tóm tắt hồ sơ theo từng nhóm thông tin; giữ nguyên bản chất nội dung, đánh dấu điểm cần xác minh, không suy diễn."],
+["Đối chiếu thông tin nhiều hồ sơ","Mẫu bảng đối chiếu","Các tài liệu/hồ sơ liên quan","Đối chiếu thông tin giữa nhiều hồ sơ, chỉ ra điểm giống, khác, thiếu hoặc mâu thuẫn. Không suy diễn nguyên nhân."],
+["Lập danh mục nội dung cần xác minh","Mẫu danh mục xác minh","Hồ sơ nguồn + yêu cầu thẩm định","Từ hồ sơ cung cấp, lập danh mục các thông tin còn thiếu hoặc chưa thống nhất cần xác minh; không đưa ra kết luận chính trị."],
+["Kiểm tra tính thống nhất lý lịch","Mẫu bảng rà soát lý lịch","Các bản lý lịch và hồ sơ nguồn","Rà soát sự thống nhất về mốc thời gian, quá trình công tác, quan hệ gia đình và thông tin khai báo giữa các tài liệu."],
+["Tổng hợp kết quả rà soát","Mẫu báo cáo tổng hợp","Phiếu rà soát/hồ sơ đã xử lý","Tổng hợp kết quả rà soát theo số liệu và nội dung có trong tài liệu; phân biệt rõ đã đủ căn cứ và còn cần xác minh."],
+["Soạn phiếu đề nghị bổ sung hồ sơ","Mẫu phiếu/đề nghị bổ sung","Kết quả rà soát hồ sơ","Soạn danh mục nội dung đề nghị bổ sung, làm rõ dựa trên kết quả rà soát; không tự thêm yêu cầu ngoài căn cứ tài liệu."]
+],
+"Đào tạo – bồi dưỡng":[
+["Tổng hợp nhu cầu","Mẫu Excel nhu cầu đào tạo","Danh sách đăng ký/kế hoạch","Tổng hợp nhu cầu đào tạo theo đối tượng, nội dung, thời gian, số lượng; phát hiện trùng lặp và dữ liệu chưa thống nhất."],
+["Soạn kế hoạch","Mẫu kế hoạch đào tạo","Kế hoạch cấp trên và dữ liệu nguồn","Soạn dự thảo kế hoạch từ tài liệu cung cấp; không tự bổ sung căn cứ pháp lý hoặc chỉ tiêu chưa có."],
+["Báo cáo kết quả","Mẫu báo cáo đào tạo","Danh sách lớp và kết quả","Tổng hợp kết quả đào tạo, bồi dưỡng; ưu tiên số lớp, lượt người, đối tượng, kết quả và khó khăn."],
+["Rà soát đối tượng cử đi học","Mẫu danh sách cử đi học","Tiêu chuẩn + danh sách cán bộ","Đối chiếu danh sách cán bộ với điều kiện, tiêu chuẩn trong tài liệu cung cấp; lập bảng đủ/chưa đủ căn cứ và nội dung cần kiểm tra."],
+["Soạn thông báo đăng ký","Mẫu Thông báo","Kế hoạch/lớp học cấp trên","Soạn dự thảo thông báo đăng ký đào tạo, bồi dưỡng từ tài liệu nguồn; giữ nguyên đối tượng, thời gian và yêu cầu."],
+["Lập danh sách cử đi học","Mẫu danh sách Excel","Danh sách đăng ký + yêu cầu lớp","Chuẩn hóa danh sách cử đi học theo dữ liệu cung cấp; phát hiện trùng, thiếu trường thông tin và sai khác."],
+["Theo dõi tiến độ học tập","Mẫu bảng theo dõi","Danh sách học viên + tiến độ","Tổng hợp tình trạng đang học, hoàn thành, chưa hoàn thành và các mốc thời gian từ dữ liệu cung cấp."],
+["Đối chiếu kế hoạch và kết quả","Mẫu bảng đối chiếu","Kế hoạch năm + kết quả thực hiện","Đối chiếu chỉ tiêu/kế hoạch đào tạo với kết quả thực hiện, tính tỷ lệ khi đủ dữ liệu và chỉ ra phần chưa hoàn thành."],
+["Tổng hợp kinh phí/nhu cầu nếu có","Mẫu bảng tổng hợp","Bảng dự toán/số liệu được cung cấp","Tổng hợp số liệu kinh phí hoặc nhu cầu đào tạo chỉ khi tài liệu có dữ liệu; không tự ước tính khoản chưa có căn cứ."]
+],
+"Đánh giá – khen thưởng":[
+["Tổng hợp đánh giá","Mẫu bảng tổng hợp đánh giá","Phiếu/bảng đánh giá","Tổng hợp kết quả theo mức xếp loại; tính tỷ lệ nếu đủ dữ liệu; chỉ ra trường hợp chưa thống nhất."],
+["Rà soát minh chứng","Mẫu bảng đối chiếu minh chứng","Tiêu chí và hồ sơ minh chứng","Đối chiếu tự đánh giá với minh chứng. Lập bảng: Tiêu chí | Kê khai | Minh chứng | Kết quả | Cần kiểm tra."],
+["Soạn báo cáo thi đua","Mẫu báo cáo thi đua","Số liệu, thành tích nguồn","Soạn báo cáo thi đua, khen thưởng từ tài liệu; không tự tạo thành tích, số liệu hoặc căn cứ."],
+["Rà soát điểm đánh giá","Mẫu bảng chấm điểm","Phiếu chấm + tiêu chí","Kiểm tra phép cộng, điểm thành phần, mức xếp loại và sự thống nhất giữa phiếu/bảng; không tự điều chỉnh điểm."],
+["Đối chiếu kết quả tháng/quý/năm","Mẫu bảng đối chiếu","Kết quả đánh giá các kỳ","So sánh kết quả đánh giá theo thời gian, chỉ ra biến động và trường hợp cần kiểm tra; không tự suy diễn nguyên nhân."],
+["Tổng hợp danh sách đề nghị khen thưởng","Mẫu danh sách đề nghị","Hồ sơ thành tích + tiêu chuẩn","Tổng hợp danh sách đề nghị khen thưởng và đối chiếu với tiêu chuẩn trong tài liệu; trường hợp thiếu minh chứng ghi [CẦN BỔ SUNG]."],
+["Kiểm tra hồ sơ khen thưởng","Checklist hồ sơ","Hồ sơ đề nghị + hướng dẫn","Lập checklist thành phần hồ sơ khen thưởng, xác định đủ/thiếu và các nội dung chưa thống nhất."],
+["Tóm tắt thành tích","Mẫu tóm tắt thành tích","Báo cáo thành tích/minh chứng","Tóm tắt thành tích từ tài liệu nguồn, ưu tiên kết quả định lượng; tuyệt đối không tự tạo hoặc phóng đại thành tích."],
+["Tổng hợp tỷ lệ xếp loại","Mẫu bảng tổng hợp","Danh sách kết quả đánh giá","Tính số lượng và tỷ lệ từng mức xếp loại khi dữ liệu đủ; chỉ ra trường hợp trùng, thiếu hoặc tổng không khớp."]
+],
+"Báo cáo – Tổng hợp":[
+["Báo cáo tháng từ báo cáo tuần","Mẫu báo cáo tháng","Báo cáo tuần + đề cương + số liệu","Đọc toàn bộ báo cáo tuần và tài liệu tôi cung cấp, xây dựng dự thảo báo cáo tháng. Loại bỏ trùng lặp; chỉ dùng thông tin trong tài liệu; mâu thuẫn ghi [CẦN KIỂM TRA], thiếu ghi [CẦN BỔ SUNG]. Cuối báo cáo lập mục NỘI DUNG CẦN CÁN BỘ KIỂM TRA."],
+["Tổng hợp nhiều báo cáo","Mẫu báo cáo tổng hợp","Các báo cáo thành phần","Tổng hợp nhiều báo cáo thành một báo cáo chung. Nhóm nội dung cùng tính chất, loại trùng, không cộng số liệu khi chưa chắc chắn không trùng đối tượng."],
+["Đối chiếu Word – Excel","Mẫu bảng đối chiếu số liệu","File Word và Excel nguồn","Đối chiếu toàn bộ số liệu Word với Excel. Lập bảng: Số liệu Word | Số liệu Excel | Kết quả | Vị trí | Đề nghị. Phân loại KHỚP / KHÔNG KHỚP / KHÔNG TÌM THẤY / CHƯA ĐỦ DỮ LIỆU."],
+["Kiểm tra trước khi trình","Phiếu rà soát văn bản","Dự thảo + tài liệu nguồn","Rà soát dự thảo về chính tả, diễn đạt, số liệu, tên người, chức vụ, đơn vị, ngày tháng, trùng lặp và dữ liệu còn sót từ văn bản cũ. Lập bảng lỗi; không tự sửa số liệu khi chưa có căn cứ."],
+["Báo cáo quý từ báo cáo tháng","Mẫu báo cáo quý","Các báo cáo tháng + đề cương","Tổng hợp các báo cáo tháng thành dự thảo báo cáo quý, loại trùng lặp, ưu tiên kết quả nổi bật và số liệu lũy kế có đủ căn cứ."],
+["Báo cáo năm từ báo cáo kỳ","Mẫu báo cáo năm","Báo cáo tháng/quý + số liệu năm","Tổng hợp tài liệu thành báo cáo năm; phân biệt số liệu kỳ và lũy kế, không cộng trùng; đánh dấu nội dung cần kiểm tra."],
+["Tóm tắt văn bản dài","Mẫu phiếu tóm tắt","Văn bản cần nghiên cứu","Tóm tắt văn bản theo: mục tiêu | đối tượng | nội dung chính | nhiệm vụ | thời hạn | trách nhiệm | điểm cần lưu ý. Không suy diễn."],
+["Bóc tách nhiệm vụ từ văn bản chỉ đạo","Mẫu bảng giao việc","Văn bản chỉ đạo","Chuyển văn bản thành bảng: Nhiệm vụ | Chủ trì | Phối hợp | Thời hạn | Sản phẩm | Căn cứ. Nội dung không nêu rõ ghi Chưa xác định."],
+["So sánh văn bản cũ – mới","Mẫu bảng so sánh","Hai phiên bản văn bản","So sánh hai văn bản, lập bảng nội dung cũ | nội dung mới | thay đổi | tác động/việc cần thực hiện; không suy diễn ngoài tài liệu."],
+["Kiểm tra căn cứ pháp lý trong dự thảo","Mẫu bảng rà soát căn cứ","Dự thảo + văn bản nguồn","Liệt kê toàn bộ căn cứ được viện dẫn trong dự thảo và đối chiếu với tài liệu cung cấp; đánh dấu căn cứ chưa có tài liệu xác minh."],
+["Chuyển Excel thành nội dung báo cáo","Mẫu đoạn báo cáo số liệu","File Excel nguồn","Phân tích bảng số liệu, nêu tổng, cơ cấu, tỷ lệ và biến động khi đủ dữ liệu; sau đó viết thành đoạn văn hành chính ngắn gọn."],
+["Phát hiện số liệu bất thường","Mẫu bảng cảnh báo","Các bảng số liệu","Phát hiện tổng không khớp, tỷ lệ bất thường, chênh lệch lớn hoặc dữ liệu thiếu; nêu vị trí và lý do cần kiểm tra, không tự sửa."],
+["Rút gọn văn bản","Mẫu văn bản rút gọn","Dự thảo cần biên tập","Rút gọn câu chữ, loại lặp ý nhưng giữ nguyên nội dung, số liệu, căn cứ và kết luận quan trọng. Không thêm thông tin mới."],
+["Chuẩn hóa văn phong hành chính","Mẫu văn phong hành chính","Dự thảo cần chỉnh sửa","Chỉnh cách diễn đạt theo văn phong hành chính, rõ ràng, mạch lạc; giữ nguyên bản chất nội dung và số liệu."],
+["Lập nội dung cần lãnh đạo cho ý kiến","Mẫu phiếu xin ý kiến","Dự thảo + tài liệu nguồn","Từ tài liệu cung cấp, bóc tách các vấn đề còn phương án khác nhau, thiếu căn cứ hoặc cần quyết định; lập danh sách ngắn gọn để xin ý kiến lãnh đạo."]
+]
+};
+let area="Công tác cán bộ", taskIndex=0;
+function renderAreas(){
+ const e=document.getElementById("areas"); e.innerHTML="";
+ Object.keys(D).forEach(n=>{let x=document.createElement("div");x.className="area"+(n===area?" active":"");x.innerHTML="<b>"+n+"</b><small>"+D[n].length+" công việc mẫu</small>";x.onclick=()=>selectArea(n);e.appendChild(x)})
+}
+function selectArea(n){area=n;taskIndex=0;renderAreas();renderTasks();show(0)}
+function renderTasks(){
+ const e=document.getElementById("tasks");e.innerHTML="";
+ D[area].forEach((t,i)=>{let b=document.createElement("button");b.textContent=t[0];b.className=i===taskIndex?"active":"";b.onclick=()=>{taskIndex=i;renderTasks();show(i)};e.appendChild(b)})
+}
+function show(i){
+ const t=D[area][i];
+ document.getElementById("title").textContent=t[0];
+ document.getElementById("desc").textContent="Lĩnh vực: "+area;
+ document.getElementById("templateText").textContent=t[1];
+ document.getElementById("docText").textContent=t[2];
+ document.getElementById("prompt").value=`Bạn đang hỗ trợ cán bộ Ban Xây dựng Đảng xã Thư Lâm thực hiện nhiệm vụ chuyên môn.
+
+LĨNH VỰC: ${area}
+CÔNG VIỆC: ${t[0]}
+
+${t[3]}
+
+NGUYÊN TẮC CHUNG:
+- Chỉ sử dụng thông tin từ tài liệu tôi cung cấp.
+- Không tự tạo số liệu, căn cứ pháp lý, tên người, chức vụ hoặc mốc thời gian.
+- Nếu phát hiện mâu thuẫn phải chỉ rõ để cán bộ kiểm tra.
+- AI chỉ hỗ trợ; cán bộ kiểm tra trước khi sử dụng chính thức.`;
+}
+function copyPrompt(){navigator.clipboard.writeText(document.getElementById("prompt").value).then(()=>alert("Đã sao chép câu lệnh AI."))}
+function ai(url){navigator.clipboard.writeText(document.getElementById("prompt").value).finally(()=>window.open(url,"_blank"))}
+function placeholder(name){alert(name+" hiện là vị trí chờ. Bản chính thức sẽ gắn tới thư mục/file dùng chung thực tế của Ban Xây dựng Đảng xã Thư Lâm.")}
+function openTemplate(){placeholder(document.getElementById("templateText").textContent)}
+function openDocs(){placeholder(document.getElementById("docText").textContent)}
+renderAreas();renderTasks();show(0);
+</script>
+
+<div id="warehouseModal">
+ <div class="modalbox">
+  <button class="close" onclick="closeWarehouse()">Đóng ✕</button>
+  <h2 style="color:#8b1e1e">KHO NGHIỆP VỤ SỐ – XÃ THƯ LÂM</h2>
+  <p>Kho dùng chung để bố trí biểu mẫu, văn bản hướng dẫn, công cụ Excel và báo cáo mẫu. Bản đơn-file này mở kho ngay trong Trung tâm AI.</p>
+  <div class="whgrid">
+   <div class="whitem"><h3>01. Công tác cán bộ</h3><p>Tờ trình, quyết định, phiếu biểu quyết, danh sách trích ngang, checklist hồ sơ.</p><button class="btn light" onclick="demoUpload('Công tác cán bộ')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>02. Tổ chức cơ sở đảng</h3><p>Quy trình, biểu mẫu kiện toàn, sinh hoạt chi bộ, báo cáo.</p><button class="btn light" onclick="demoUpload('Tổ chức cơ sở đảng')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>03. Công tác đảng viên</h3><p>Danh sách, biểu tổng hợp, mẫu báo cáo và hướng dẫn.</p><button class="btn light" onclick="demoUpload('Công tác đảng viên')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>04. BVCTNB</h3><p>Phiếu rà soát, checklist và hướng dẫn nghiệp vụ.</p><button class="btn light" onclick="demoUpload('BVCTNB')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>05. Đào tạo – bồi dưỡng</h3><p>Kế hoạch, danh sách, biểu nhu cầu, báo cáo kết quả.</p><button class="btn light" onclick="demoUpload('Đào tạo – bồi dưỡng')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>06. Đánh giá – khen thưởng</h3><p>Phiếu đánh giá, bảng tổng hợp, minh chứng và báo cáo.</p><button class="btn light" onclick="demoUpload('Đánh giá – khen thưởng')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>07. Báo cáo – tổng hợp</h3><p>Báo cáo tuần/tháng/quý, đề cương và bảng số liệu.</p><button class="btn light" onclick="demoUpload('Báo cáo – tổng hợp')">Chọn tài liệu</button></div>
+   <div class="whitem"><h3>08. Hướng dẫn AI</h3><p>Nguyên tắc sử dụng AI và checklist kiểm tra kết quả.</p><button class="btn light" onclick="showGuide()">Xem hướng dẫn</button></div>
+  </div>
+  <input id="hiddenUploader" type="file" multiple style="display:none">
+  <div id="warehouseInfo" style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:9px;color:#4b5563">Chọn một nhóm để thử thêm tài liệu.</div>
+ </div>
+</div>
+</body>
+<script>
+function openWarehouse(){document.getElementById('warehouseModal').style.display='block'}
+function closeWarehouse(){document.getElementById('warehouseModal').style.display='none'}
+let whGroup='';
+function demoUpload(g){
+ whGroup=g;
+ const u=document.getElementById('hiddenUploader');
+ u.value='';
+ u.onchange=function(){
+   const names=[...u.files].map(x=>x.name);
+   document.getElementById('warehouseInfo').innerHTML='<b>'+g+':</b> đã chọn '+names.length+' file:<br>'+names.join('<br>')+'<br><small>Lưu ý: file HTML cục bộ chỉ chọn/hiển thị tên file, không thể tự lưu file vào kho dùng chung.</small>';
+ };
+ u.click();
+}
+function showGuide(){
+ document.getElementById('warehouseInfo').innerHTML='<b>Hướng dẫn AI:</b><br>1. Không đưa tài liệu mật hoặc dữ liệu không được phép chia sẻ lên AI công cộng.<br>2. Kiểm tra số liệu, tên người, chức vụ, ngày tháng và căn cứ pháp lý.<br>3. Không sử dụng nguyên kết quả AI khi chưa rà soát.<br>4. Cán bộ chuyên môn chịu trách nhiệm về sản phẩm cuối cùng.';
+}
+</script>
+</html>
