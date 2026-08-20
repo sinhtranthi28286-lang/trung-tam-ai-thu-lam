@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trung tâm AI - Ban Xây dựng Đảng xã Thư Lâm</title>
+<style>
+:root{
+  --red:#b3261e; --red-dark:#981b16; --red-bright:#cf3429;
+  --gold:#e3b63f; --gold-2:#f5d77b; --cream:#fff8dc;
+  --bg:#f7f6f2; --card:#fffdfa; --line:#ead9c8;
+  --text:#2d241f; --muted:#75685f; --shadow:0 8px 22px rgba(88,35,20,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial,Helvetica,sans-serif;
+  background:
+    radial-gradient(circle at 5% 18%,rgba(244,200,75,.08),transparent 18%),
+    linear-gradient(180deg,#faf9f6 0,#f4f5f7 100%);
+  color:var(--text);
+}
+button,input,textarea,select{font:inherit}
+button{transition:.18s ease}
+button:hover{transform:translateY(-1px)}
+/* ===================== BANNER ===================== */
+.hero{
+  position:relative; overflow:hidden;
+  min-height:230px; border-bottom:3px solid #dfb642;
+  background:
+    linear-gradient(102deg,#a91f18 0 45.5%,#f6d979 45.7% 47.4%,#fff6d3 47.6% 100%);
+  box-shadow:0 3px 14px rgba(70,30,20,.10);
+}
+.hero:before{
+  content:"";position:absolute;left:-85px;top:-120px;width:360px;height:360px;
+  border:2px solid rgba(255,215,93,.13);border-radius:50%;
+  box-shadow:
+   0 0 0 22px rgba(255,215,93,.045),
+   0 0 0 52px rgba(255,215,93,.035),
+   0 0 0 86px rgba(255,215,93,.025);
+}
+.hero:after{
+  content:"✿";position:absolute;right:36px;bottom:-42px;
+  font-family:Georgia,serif;font-size:190px;line-height:1;color:rgba(190,128,32,.12);
+  transform:rotate(-8deg);
+}
+.hero-curve{
+  position:absolute;inset:0;pointer-events:none;
+}
+.hero-curve:before{
+  content:"";position:absolute;left:44.8%;top:-70px;width:34px;height:370px;
+  background:linear-gradient(180deg,#f2ce6b,#dcae34);
+  transform:rotate(12deg);border-radius:30px;
+  box-shadow:9px 0 0 rgba(255,246,205,.82);
+}
+.hero-inner{
+  position:relative;z-index:2;max-width:1420px;margin:auto;
+  display:grid;grid-template-columns:46% 54%;min-height:226px;
+}
+.hero-left,.hero-right{display:flex;align-items:center;justify-content:center;text-align:center;padding:20px 28px}
+.hero-left{padding-right:46px}
+.hero-right{padding-left:48px}
+.party-emblem{
+  width:84px;height:84px;margin:0 auto 9px;border:2px solid #f1cf64;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:#f7d862;font-size:51px;font-family:Arial,sans-serif;
+  background:radial-gradient(circle,#c72f26,#9d1b16 72%);
+  box-shadow:inset 0 0 0 4px rgba(255,225,125,.06),0 5px 12px rgba(50,0,0,.14)
+}
+.hero-left .org1{
+  color:#fff;font-weight:800;font-size:21px;letter-spacing:.35px;text-transform:uppercase;
+  text-shadow:0 1px 1px rgba(0,0,0,.12);white-space:nowrap
+}
+.hero-left .org2{
+  color:#f2cf58;font-family:Georgia,"Times New Roman",serif;font-size:27px;font-weight:800;
+  margin-top:5px;text-transform:uppercase;letter-spacing:.2px;white-space:nowrap
+}
+.starline{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:8px;color:#ffd34e}
+.starline:before,.starline:after{content:"";width:105px;height:1px;background:linear-gradient(90deg,transparent,#eec94e)}
+.starline:after{background:linear-gradient(90deg,#eec94e,transparent)}
+.hero-right{color:#9f150f}
+.hero-kicker{
+  font-size:13px;font-weight:900;letter-spacing:1.6px;color:#9d6321;text-transform:uppercase
+}
+.hero-stars{color:#d21b15;letter-spacing:8px;font-size:14px;margin:5px 0 0}
+.hero-title{
+  font-family:Georgia,"Times New Roman",serif;font-size:48px;line-height:1.02;font-weight:900;
+  letter-spacing:1.2px;color:#a51f18;margin:3px 0 7px;text-shadow:0 1px #fff
+}
+.hero-sub{font-family:Georgia,"Times New Roman",serif;font-size:22px;font-weight:800;color:#a5261c}
+.hero-tools{display:flex;justify-content:center;gap:23px;flex-wrap:wrap;margin-top:18px;font-size:13px;font-weight:800;color:#8b2718}
+.hero-tools span{display:inline-flex;align-items:center;gap:6px}
+.hero-tools i{font-style:normal;color:#b20f0a;font-size:18px}
+
+/* ===================== CONTENT ===================== */
+.wrap{max-width:1420px;margin:18px auto 30px;padding:0 18px}
+.notice{
+  display:flex;align-items:center;gap:16px;background:var(--card);border:1px solid #efc9bd;
+  border-left:5px solid var(--red);border-radius:14px;padding:14px 18px;margin-bottom:18px;
+  box-shadow:0 5px 18px rgba(85,30,10,.055);line-height:1.5
+}
+.notice-icon{font-size:34px;color:var(--red);flex:0 0 auto}
+.notice strong{color:var(--red)}
+.area-grid{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px
+}
+.area{
+ position:relative;overflow:hidden;background:linear-gradient(145deg,#b20e08,#8b0805);
+ border:1px solid #c74331;border-radius:13px;padding:15px 14px;cursor:pointer;min-height:94px;
+ box-shadow:0 5px 12px rgba(100,20,10,.12);color:#fff
+}
+.area:before{
+ content:"★";position:absolute;right:10px;top:8px;color:rgba(255,214,74,.22);font-size:28px
+}
+.area b{display:block;color:#ffe36c;margin-bottom:7px;font-size:15px;text-transform:uppercase;line-height:1.25}
+.area small{color:#fff;font-weight:600}
+.area:hover,.area.active{
+ background:linear-gradient(145deg,#cf392f,#a5221b);border-color:#f2c546;
+ box-shadow:0 8px 19px rgba(137,23,12,.22),inset 0 0 0 1px rgba(255,224,93,.24)
+}
+.main{display:grid;grid-template-columns:330px 1fr;gap:18px}
+.card{
+ background:rgba(255,253,250,.96);border:1px solid var(--line);border-radius:16px;padding:18px;
+ box-shadow:var(--shadow)
+}
+.side-card{
+ background:linear-gradient(180deg,#a92720,#871812);border:1px solid #b62719;color:#fff
+}
+.side-card h2{
+ color:#ffe066!important;text-align:center;border-bottom:1px solid rgba(255,220,85,.38);
+ padding-bottom:13px;margin-bottom:10px!important;text-transform:uppercase;font-size:18px!important
+}
+h2{margin:0 0 13px;color:var(--red);font-size:21px}
+.tasks{max-height:620px;overflow:auto;padding-right:3px}
+.tasks::-webkit-scrollbar{width:7px}.tasks::-webkit-scrollbar-thumb{background:#d9ad3d;border-radius:8px}
+.tasks button{
+ width:100%;text-align:left;color:#fff;background:rgba(75,3,2,.54);
+ border:1px solid rgba(242,193,57,.62);border-radius:9px;padding:11px 12px;margin:5px 0;cursor:pointer;
+ font-weight:600
+}
+.tasks button:after{content:"›";float:right;color:#ffd94e;font-size:20px;line-height:16px}
+.tasks button:hover,.tasks button.active{
+ background:linear-gradient(90deg,#cf352b,#ad211a);color:#fff;border-color:#ffe06a
+}
+.topline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.badge{
+ background:linear-gradient(180deg,#ffe585,#efbd32);color:#7b240f;border-radius:999px;padding:8px 12px;
+ font-size:12px;font-weight:900;border:1px solid #e1ae26;white-space:nowrap
+}
+.desc{color:var(--muted);margin:5px 0 14px}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
+.step{
+ background:#fffaf4;border:1px solid #ead7c9;border-radius:12px;padding:13px;font-size:13px;line-height:1.45;
+ box-shadow:0 2px 7px rgba(70,20,10,.035)
+}
+.step b{display:block;color:var(--red);margin-bottom:5px;font-size:14px}
+.resource{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:13px 0}
+.res{border:1px solid #ead7c9;border-radius:13px;padding:14px;background:#fffdfa}
+.res h3{font-size:16px;margin:0 0 6px;color:var(--red)}
+.res p{font-size:13px;color:var(--muted);margin:0 0 9px}
+.btn{border:0;border-radius:9px;padding:10px 13px;font-weight:800;cursor:pointer;margin:4px 5px 4px 0}
+.primary{background:linear-gradient(180deg,#bd3329,#982019);color:#fff;box-shadow:0 3px 8px rgba(130,15,8,.15)}
+.dark{background:#43342e;color:#fff}
+.light{background:#f5eee8;color:#5a3327;border:1px solid #e7d5c8}
+textarea{
+ width:100%;min-height:205px;border:1px solid #dfcec1;border-radius:11px;padding:13px;background:#fffefa;
+ resize:vertical;line-height:1.48;color:#2c2622
+}
+.library{margin-top:18px}
+.library h2{text-transform:uppercase;border-bottom:2px solid #f0c84c;padding-bottom:10px}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px}
+.lib{
+ border:1px solid #ead6c7;border-radius:12px;padding:14px;background:linear-gradient(180deg,#fffdf9,#fff9ef);
+ box-shadow:0 4px 12px rgba(75,25,10,.045)
+}
+.lib b{color:var(--red);font-size:15px}.lib p{font-size:13px;color:var(--muted);min-height:39px}
+footer{
+ background:linear-gradient(90deg,#982018,#b63328,#982018);color:#ffe17a;
+ text-align:center;padding:18px;font-family:Georgia,"Times New Roman",serif;font-weight:800;letter-spacing:.5px
+}
+
+/* Warehouse */
+#warehouseModal,#adminModal{display:none;position:fixed;inset:0;background:rgba(54,8,5,.67);z-index:9999;padding:20px;overflow:auto;backdrop-filter:blur(2px)}
+#adminModal{z-index:10000}
+#warehouseModal .modalbox,#adminModal .adminbox{max-width:1100px;margin:20px auto;background:#fffdfa;border-radius:16px;padding:20px;border:1px solid #e6cfbe;box-shadow:0 20px 60px rgba(50,10,5,.25)}
+#warehouseModal .close,.admin-close{float:right;background:#7f150f;color:#fff;border:0;border-radius:8px;padding:9px 12px;cursor:pointer}
+.whgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;clear:both;padding-top:12px}
+.whitem{border:1px solid #ead8cb;border-radius:11px;padding:13px;background:#fff9f0}.whitem h3{margin:0 0 7px;color:var(--red);font-size:16px}
+.wh-toolbar,.admin-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+.wh-current{padding:10px 12px;background:#fff5e5;border:1px solid #e9c78e;border-radius:9px;font-weight:700;color:#8b1e1e}
+.wh-files{margin-top:12px;border:1px solid #e3d7ce;border-radius:10px;overflow:hidden}
+.wh-row{display:grid;grid-template-columns:minmax(220px,1fr) 110px 155px 145px;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid #eee4dc;background:#fff}
+.wh-row:last-child{border-bottom:0}.wh-name{font-weight:700;word-break:break-word}.wh-meta{font-size:12px;color:#74685f}
+.wh-actions{display:flex;gap:6px;flex-wrap:wrap}
+.wh-smallbtn{border:0;border-radius:7px;padding:7px 9px;cursor:pointer;font-weight:700;background:#f1eae5;color:#493831}
+.wh-smallbtn.primary{background:var(--red);color:#fff}
+.wh-status{margin-top:10px;padding:10px 12px;border-radius:9px;background:#faf8f6;color:#4b5563}
+.wh-status.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}.wh-status.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.wh-search{min-width:220px;padding:9px 10px;border:1px solid #d9cbc1;border-radius:8px}
+.admin-launch{
+ position:fixed;right:18px;bottom:18px;z-index:9000;background:linear-gradient(180deg,#b93127,#962019);
+ color:#fff;border:2px solid #f0c54b;border-radius:999px;padding:11px 16px;font-weight:800;cursor:pointer;
+ box-shadow:0 7px 20px rgba(80,10,5,.25)
+}
+.admin-head{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e7d9cf;padding-bottom:12px;margin-bottom:14px}
+.admin-login{max-width:520px;margin:18px auto;padding:18px;border:1px solid #e5d9d0;border-radius:12px;background:#fff9f1}
+.admin-login input,.admin-form input,.admin-form textarea,.admin-form select{width:100%;padding:10px;border:1px solid #d9cbc1;border-radius:8px;margin:5px 0 10px;background:#fff}
+.admin-grid{display:grid;grid-template-columns:330px 1fr;gap:16px}
+.admin-card{border:1px solid #e4d6cc;border-radius:12px;padding:14px;background:#fffdfa}
+.admin-list button{width:100%;text-align:left;border:1px solid #e2d5cb;background:#fff;border-radius:8px;padding:9px;margin:4px 0;cursor:pointer}
+.admin-list button.active{border-color:var(--red);background:#fff1ec;color:var(--red);font-weight:700}
+.admin-table{width:100%;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #e8ddd6;padding:9px;text-align:left;vertical-align:top;font-size:13px}
+.admin-pill{display:inline-block;background:#fff0e7;color:#9f2717;border-radius:999px;padding:4px 8px;font-size:12px}
+.admin-msg{padding:10px 12px;border-radius:8px;background:#faf8f6;margin:10px 0;color:#4b5563}
+.admin-msg.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}.admin-msg.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+@media(max-width:900px){
+ .hero{background:linear-gradient(180deg,var(--red-dark) 0 49%,#fff7d4 49.2% 100%);min-height:390px}
+ .hero-inner{grid-template-columns:1fr}.hero-left,.hero-right{padding:16px 20px}
+ .hero-curve{display:none}.hero-title{font-size:38px}.hero-left .org2{font-size:24px;white-space:normal}.hero-left .org1{white-space:normal}
+ .main{grid-template-columns:1fr}.flow,.resource{grid-template-columns:1fr}
+ .side-card{order:0}.wh-row{grid-template-columns:1fr}.admin-grid{grid-template-columns:1fr}
+}
+@media(max-width:580px){.hero-title{font-size:32px}.hero-tools{gap:10px}.wrap{padding:0 10px}.notice{align-items:flex-start}.area-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<button class="admin-launch" onclick="openAdmin()">⚙ Quản trị</button>
+
+<header class="hero">
+  <div class="hero-curve"></div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div>
+        <div class="party-emblem">☭</div>
+        <div class="org1">ĐẢNG BỘ XÃ THƯ LÂM</div>
+        <div class="org2">BAN XÂY DỰNG ĐẢNG</div>
+        <div class="starline">★</div>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div>
+        <div class="hero-kicker">NỀN TẢNG HỖ TRỢ NGHIỆP VỤ SỐ</div>
+        <div class="hero-stars">★ ★ ★</div>
+        <div class="hero-title">TRUNG TÂM AI</div>
+        <div class="hero-sub">BAN XÂY DỰNG ĐẢNG XÃ THƯ LÂM</div>
+        <div class="hero-tools">
+          <span><i>▣</i>Nghiệp vụ số</span>
+          <span><i>▤</i>Biểu mẫu</span>
+          <span><i>⚙</i>Công cụ AI</span>
+          <span><i>▰</i>Kho tài liệu dùng chung</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="notice">
+  <div class="notice-icon">📣</div>
+  <div><strong>Bản chính thức – Kho dữ liệu trực tuyến:</strong> Mỗi công việc được đặt cùng <strong>câu lệnh AI + biểu mẫu + tài liệu tham khảo</strong>. Kho nghiệp vụ số đã được kết nối lưu trữ trực tuyến để cán bộ có thể tải lên, xem và tải xuống tài liệu dùng chung.</div>
+</div>
+
+<div class="area-grid" id="areas"></div>
+
+<div class="main">
+  <div class="card side-card">
+    <h2>▣ DANH MỤC CÔNG VIỆC</h2>
+    <div class="tasks" id="tasks"></div>
+  </div>
+
+  <div class="card">
+    <div class="topline"><div><h2 id="title">Chọn công việc</h2><div class="desc" id="desc"></div></div><span class="badge">🤖 AI + NGHIỆP VỤ</span></div>
+    <div class="flow">
+      <div class="step"><b>🎯 CHỌN CÔNG VIỆC</b>Chọn đúng nghiệp vụ đang thực hiện.</div>
+      <div class="step"><b>📁 LẤY MẪU/TÀI LIỆU</b>Mở mẫu hoặc kho tài liệu liên quan nếu cần.</div>
+      <div class="step"><b>🤖 XỬ LÝ BẰNG AI</b>Mở nền tảng AI, tải tài liệu và dùng câu lệnh chuẩn.</div>
+    </div>
+
+    <div class="resource">
+      <div class="res">
+        <h3>📄 BIỂU MẪU NGHIỆP VỤ</h3>
+        <p id="templateText">Chọn công việc để xem biểu mẫu gợi ý.</p>
+        <button class="btn light" onclick="openWarehouse()">MỞ MẪU / THƯ MỤC MẪU</button>
+      </div>
+      <div class="res">
+        <h3>📚 TÀI LIỆU THAM KHẢO</h3>
+        <p id="docText">Chọn công việc để xem nhóm tài liệu liên quan.</p>
+        <button class="btn light" onclick="openWarehouse()">MỞ KHO TÀI LIỆU</button>
+      </div>
+    </div>
+
+    <h2 style="font-size:17px;margin-top:15px">💬 CÂU LỆNH AI CHUẨN</h2>
+    <textarea id="prompt" readonly>Đang tải dữ liệu nghiệp vụ...</textarea>
+    <div>
+      <button class="btn primary" onclick="copyPrompt()">📋 Sao chép câu lệnh</button>
+      <button class="btn dark" onclick="ai('https://chatgpt.com/')">ChatGPT</button>
+      <button class="btn light" onclick="ai('https://copilot.microsoft.com/')">Copilot</button>
+      <button class="btn light" onclick="ai('https://gemini.google.com/')">Gemini</button>
+    </div>
+    <div class="desc">Kho nghiệp vụ số được tích hợp trực tuyến, cán bộ có thể sử dụng ngay trên trình duyệt.</div>
+  </div>
+</div>
+
+<div class="card library">
+<h2>📚 KHO NGHIỆP VỤ SỐ THƯ LÂM</h2>
+<div class="libgrid">
+<div class="lib"><b>01. KHO BIỂU MẪU</b><p>Tờ trình, quyết định, thông báo, danh sách, phiếu, biên bản, biểu Excel.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>02. KHO VĂN BẢN</b><p>Quy định, hướng dẫn, kế hoạch, công văn và văn bản nghiệp vụ thường dùng.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>03. CÔNG CỤ EXCEL</b><p>Theo dõi cán bộ, nâng lương, đào tạo, nhiệm vụ, số liệu báo cáo.</p><button class="btn light" onclick="openWarehouse()">Mở công cụ</button></div>
+<div class="lib"><b>04. BÁO CÁO MẪU</b><p>Các báo cáo đã hoàn thiện để tham khảo cấu trúc và cách trình bày.</p><button class="btn light" onclick="openWarehouse()">Mở kho</button></div>
+<div class="lib"><b>05. HƯỚNG DẪN AI</b><p>Nguyên tắc sử dụng, kiểm tra kết quả và bảo vệ dữ liệu khi dùng AI.</p><button class="btn light" onclick="openWarehouse()">Xem hướng dẫn</button></div>
+</div>
+</div>
+</div>
+
+<footer>★ ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM ★ &nbsp; | &nbsp; Trung tâm AI – Ban Xây dựng Đảng xã Thư Lâm</footer>
+
+<div id="warehouseModal">
+ <div class="modalbox">
+  <button class="close" onclick="closeWarehouse()">Đóng ✕</button>
+  <h2>KHO NGHIỆP VỤ SỐ – XÃ THƯ LÂM</h2>
+  <p>Kho dùng chung trực tuyến. Cán bộ chọn lĩnh vực, tải tài liệu lên và tài liệu sẽ được lưu online để mọi người cùng xem/tải xuống.</p>
+  <div class="whgrid" id="warehouseGroups"></div>
+  <div style="margin-top:18px;border-top:1px solid #e5d7cd;padding-top:16px">
+    <div id="whCurrent" class="wh-current">Chọn một nhóm nghiệp vụ ở phía trên.</div>
+    <div class="wh-toolbar">
+      <button class="btn primary" onclick="chooseUploadFiles()">＋ Tải tài liệu lên</button>
+      <button class="btn light" onclick="loadWarehouseFiles()">↻ Làm mới danh sách</button>
+      <input id="whSearch" class="wh-search" placeholder="Tìm theo tên file..." oninput="renderWarehouseFiles()">
+      <input id="hiddenUploader" type="file" multiple style="display:none">
+    </div>
+    <div id="warehouseInfo" class="wh-status">Kho đã sẵn sàng. Chọn lĩnh vực để xem tài liệu.</div>
+    <div id="warehouseFiles" class="wh-files"></div>
+    <p class="wh-meta" style="margin-top:10px">Giới hạn hiện tại: tối đa 20 MB/tệp. Không tải tài liệu mật hoặc dữ liệu không được phép lưu trực tuyến.</p>
+  </div>
+ </div>
+</div>
+
+<div id="adminModal">
+ <div class="adminbox">
+  <div class="admin-head">
+    <div>
+      <h2 style="margin:0">⚙ QUẢN TRỊ TRUNG TÂM AI</h2>
+      <div class="desc">Chỉ tài khoản quản trị được phép thêm, sửa hoặc xóa lĩnh vực và công việc.</div>
+    </div>
+    <button class="admin-close" onclick="closeAdmin()">Đóng ✕</button>
+  </div>
+
+  <div id="adminLogin" class="admin-login">
+    <h3 style="margin-top:0;color:#8b1e1e">Đăng nhập quản trị</h3>
+    <label>Email</label>
+    <input id="adminEmail" type="email" placeholder="Email quản trị">
+    <label>Mật khẩu</label>
+    <input id="adminPassword" type="password" placeholder="Mật khẩu">
+    <button class="btn primary" onclick="adminSignIn()">Đăng nhập</button>
+    <div id="adminLoginMsg" class="admin-msg">Nhập tài khoản quản trị đã tạo trên Supabase.</div>
+  </div>
+
+  <div id="adminPanel" style="display:none">
+    <div class="admin-toolbar">
+      <span class="admin-pill" id="adminIdentity"></span>
+      <button class="btn light" onclick="adminSignOut()">Đăng xuất</button>
+    </div>
+    <div id="adminMsg" class="admin-msg">Sẵn sàng quản trị.</div>
+
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3 style="margin-top:0;color:#8b1e1e">Lĩnh vực</h3>
+        <div class="admin-toolbar"><button class="btn primary" onclick="showAreaForm()">＋ Thêm lĩnh vực</button></div>
+        <div id="adminAreaList" class="admin-list"></div>
+      </div>
+      <div class="admin-card">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <h3 style="margin:0;color:#8b1e1e">Công việc</h3>
+          <button class="btn primary" onclick="showTaskForm()">＋ Thêm công việc</button>
+        </div>
+        <div id="adminCurrentArea" class="desc">Chưa chọn lĩnh vực.</div>
+        <div id="adminTaskList"></div>
+      </div>
+    </div>
+
+    <div id="areaFormBox" class="admin-card admin-form" style="display:none;margin-top:16px">
+      <h3 id="areaFormTitle" style="color:#8b1e1e">Thêm lĩnh vực</h3>
+      <input id="areaId" type="hidden">
+      <label>Tên lĩnh vực</label><input id="areaName" placeholder="Ví dụ: Công tác cán bộ">
+      <label>Thứ tự hiển thị</label><input id="areaSort" type="number" value="0">
+      <button class="btn primary" onclick="saveArea()">Lưu lĩnh vực</button>
+      <button class="btn light" onclick="hideAreaForm()">Hủy</button>
+    </div>
+
+    <div id="taskFormBox" class="admin-card admin-form" style="display:none;margin-top:16px">
+      <h3 id="taskFormTitle" style="color:#8b1e1e">Thêm công việc</h3>
+      <input id="taskId" type="hidden">
+      <label>Lĩnh vực</label><select id="taskAreaId"></select>
+      <label>Tên công việc</label><input id="taskName">
+      <label>Biểu mẫu nghiệp vụ</label><input id="taskTemplate">
+      <label>Tài liệu tham khảo</label><input id="taskDocs">
+      <label>Câu lệnh AI</label><textarea id="taskPrompt" style="min-height:150px"></textarea>
+      <label>Thứ tự hiển thị</label><input id="taskSort" type="number" value="0">
+      <button class="btn primary" onclick="saveTask()">Lưu công việc</button>
+      <button class="btn light" onclick="hideTaskForm()">Hủy</button>
+    </div>
+  </div>
+ </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://uycbkcdmkxgbbdqjyqpt.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_wWNfjRlqokiDKgTotNHKyQ_STmCTKSd";
+const STORAGE_BUCKET="kho-nghiep-vu-so";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+
+let D={}, area="", taskIndex=0;
+let dbAreas=[],dbTasks=[],selectedAdminAreaId=null,currentAdminUser=null,isAdmin=false;
+let whGroup="",whFolder="",whFilesCache=[];
+
+const GROUP_SLUGS={
+ "Công tác cán bộ":"cong-tac-can-bo",
+ "Tổ chức cơ sở đảng":"to-chuc-co-so-dang",
+ "Công tác đảng viên":"cong-tac-dang-vien",
+ "BVCTNB":"bvctnb",
+ "Đào tạo – bồi dưỡng":"dao-tao-boi-duong",
+ "Đánh giá – khen thưởng":"danh-gia-khen-thuong",
+ "Báo cáo – Tổng hợp":"bao-cao-tong-hop",
+ "Báo cáo – tổng hợp":"bao-cao-tong-hop",
+ "Hướng dẫn AI":"huong-dan-ai"
+};
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function slugForGroup(g){
+ if(GROUP_SLUGS[g]) return GROUP_SLUGS[g];
+ return String(g).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/đ/g,"d").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+}
+function renderAreas(){
+ const e=document.getElementById("areas");e.innerHTML="";
+ Object.keys(D).forEach((n,idx)=>{
+   const x=document.createElement("div");x.className="area"+(n===area?" active":"");
+   x.innerHTML="<b>"+esc(n)+"</b><small>"+D[n].length+" công việc mẫu</small>";
+   x.onclick=()=>selectArea(n);e.appendChild(x)
+ })
+}
+function selectArea(n){area=n;taskIndex=0;renderAreas();renderTasks();show(0)}
+function renderTasks(){
+ const e=document.getElementById("tasks");e.innerHTML="";
+ (D[area]||[]).forEach((t,i)=>{
+   const b=document.createElement("button");b.textContent=t[0];b.className=i===taskIndex?"active":"";
+   b.onclick=()=>{taskIndex=i;renderTasks();show(i)};e.appendChild(b)
+ })
+}
+function show(i){
+ const t=(D[area]||[])[i];if(!t){document.getElementById("title").textContent="Chưa có công việc";return}
+ document.getElementById("title").textContent=t[0];
+ document.getElementById("desc").textContent="Lĩnh vực: "+area;
+ document.getElementById("templateText").textContent=t[1]||"";
+ document.getElementById("docText").textContent=t[2]||"";
+ document.getElementById("prompt").value=`Bạn đang hỗ trợ cán bộ Ban Xây dựng Đảng xã Thư Lâm thực hiện nhiệm vụ chuyên môn.
+
+LĨNH VỰC: ${area}
+CÔNG VIỆC: ${t[0]}
+
+${t[3]||""}
+
+NGUYÊN TẮC CHUNG:
+- Chỉ sử dụng thông tin từ tài liệu tôi cung cấp.
+- Không tự tạo số liệu, căn cứ pháp lý, tên người, chức vụ hoặc mốc thời gian.
+- Nếu phát hiện mâu thuẫn phải chỉ rõ để cán bộ kiểm tra.
+- AI chỉ hỗ trợ; cán bộ kiểm tra trước khi sử dụng chính thức.`;
+}
+function copyPrompt(){navigator.clipboard.writeText(document.getElementById("prompt").value).then(()=>alert("Đã sao chép câu lệnh AI."))}
+function ai(url){navigator.clipboard.writeText(document.getElementById("prompt").value).finally(()=>window.open(url,"_blank"))}
+
+async function loadDataFromSupabase(){
+ try{
+  const {data:areasData,error:areasErr}=await sb.from("ai_areas").select("*").order("sort_order",{ascending:true}).order("id",{ascending:true});
+  if(areasErr)throw areasErr;
+  const {data:tasksData,error:tasksErr}=await sb.from("ai_tasks").select("*").order("sort_order",{ascending:true}).order("id",{ascending:true});
+  if(tasksErr)throw tasksErr;
+  dbAreas=areasData||[];dbTasks=tasksData||[];
+  const newD={};dbAreas.forEach(a=>newD[a.name]=[]);
+  dbTasks.forEach(t=>{const a=dbAreas.find(x=>x.id===t.area_id);if(a&&newD[a.name])newD[a.name].push([t.name,t.template_name||"",t.reference_docs||"",t.ai_prompt||""])});
+  D=newD;
+  if(!Object.keys(D).length)throw new Error("Kho dữ liệu nghiệp vụ hiện chưa có nội dung.");
+  if(!D[area])area=Object.keys(D)[0];
+  taskIndex=0;renderAreas();renderTasks();show(0);renderWarehouseGroups();refreshAdminUI();
+ }catch(e){
+   document.getElementById("prompt").value="Chưa tải được dữ liệu nghiệp vụ trực tuyến. Vui lòng tải lại trang hoặc kiểm tra kết nối Internet.";
+   console.warn(e);
+ }
+}
+
+/* Warehouse */
+function renderWarehouseGroups(){
+ const names=[...new Set([...Object.keys(D),"Hướng dẫn AI"])];
+ document.getElementById("warehouseGroups").innerHTML=names.map((n,i)=>`<div class="whitem"><h3>${String(i+1).padStart(2,"0")}. ${esc(n)}</h3><button class="btn light" onclick="selectWarehouseGroup('${String(n).replace(/'/g,"\\'")}')">Mở kho</button></div>`).join("");
+}
+function openWarehouse(){document.getElementById("warehouseModal").style.display="block";renderWarehouseGroups()}
+function closeWarehouse(){document.getElementById("warehouseModal").style.display="none"}
+function setWarehouseStatus(msg,type=""){const e=document.getElementById("warehouseInfo");e.className="wh-status"+(type?" "+type:"");e.textContent=msg}
+function selectWarehouseGroup(g){whGroup=g;whFolder=slugForGroup(g);document.getElementById("whCurrent").textContent="Đang mở: "+g;document.getElementById("whSearch").value="";loadWarehouseFiles()}
+function chooseUploadFiles(){if(!whFolder){setWarehouseStatus("Hãy chọn một nhóm nghiệp vụ trước khi tải tài liệu.","err");return}const i=document.getElementById("hiddenUploader");i.value="";i.onchange=uploadSelectedFiles;i.click()}
+function safeFileName(n){return n.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9._-]+/g,"_").replace(/_+/g,"_")}
+function displayName(n){return n.replace(/^\d+_/,"")}
+function formatBytes(b){if(!b)return "";if(b<1024)return b+" B";if(b<1048576)return (b/1024).toFixed(1)+" KB";return (b/1048576).toFixed(1)+" MB"}
+async function uploadSelectedFiles(){
+ const files=[...document.getElementById("hiddenUploader").files];if(!files.length)return;
+ const big=files.filter(f=>f.size>20*1024*1024);if(big.length){setWarehouseStatus("Có tệp vượt 20 MB: "+big.map(f=>f.name).join(", "),"err");return}
+ setWarehouseStatus("Đang tải "+files.length+" tệp lên kho trực tuyến...");
+ let ok=0,errors=[];
+ for(const f of files){
+  const path=whFolder+"/"+Date.now()+"_"+safeFileName(f.name);
+  const {error}=await sb.storage.from(STORAGE_BUCKET).upload(path,f,{cacheControl:"3600",upsert:false,contentType:f.type||undefined});
+  if(error)errors.push(f.name+": "+error.message);else ok++;
+  await new Promise(r=>setTimeout(r,20));
+ }
+ setWarehouseStatus(errors.length?`Đã tải ${ok}/${files.length} tệp. Lỗi: ${errors.join(" | ")}`:`Đã tải thành công ${ok} tệp vào kho ${whGroup}.`,errors.length?"err":"ok");
+ await loadWarehouseFiles(false)
+}
+async function loadWarehouseFiles(showStatus=true){
+ if(!whFolder)return;if(showStatus)setWarehouseStatus("Đang tải danh sách tài liệu...");
+ const {data,error}=await sb.storage.from(STORAGE_BUCKET).list(whFolder,{limit:200,sortBy:{column:"created_at",order:"desc"}});
+ if(error){whFilesCache=[];renderWarehouseFiles();setWarehouseStatus("Chưa đọc được danh sách: "+error.message,"err");return}
+ whFilesCache=(data||[]).filter(x=>x.name);renderWarehouseFiles();setWarehouseStatus(`Có ${whFilesCache.length} tài liệu trong kho ${whGroup}.`,"ok")
+}
+function renderWarehouseFiles(){
+ const box=document.getElementById("warehouseFiles");if(!whFolder){box.innerHTML="";return}
+ const q=(document.getElementById("whSearch").value||"").toLowerCase();
+ const list=whFilesCache.filter(f=>displayName(f.name).toLowerCase().includes(q));
+ if(!list.length){box.innerHTML='<div style="padding:16px;color:#75685f">Chưa có tài liệu phù hợp.</div>';return}
+ box.innerHTML=list.map(f=>{
+  const url=sb.storage.from(STORAGE_BUCKET).getPublicUrl(whFolder+"/"+f.name).data.publicUrl;
+  const dt=f.created_at?new Date(f.created_at).toLocaleString("vi-VN"):"";
+  const size=f.metadata?.size?formatBytes(f.metadata.size):"";
+  const name=displayName(f.name);
+  return `<div class="wh-row">
+   <div><div class="wh-name">📄 ${esc(name)}</div><div class="wh-meta">${esc(f.metadata?.mimetype||"")}</div></div>
+   <div class="wh-meta">${esc(size)}</div><div class="wh-meta">${esc(dt)}</div>
+   <div class="wh-actions"><button class="wh-smallbtn primary" onclick="window.open('${url}','_blank')">Xem</button><a class="wh-smallbtn" href="${url}" target="_blank" download="${esc(name)}" style="text-decoration:none">Tải xuống</a></div>
+  </div>`
+ }).join("")
+}
+
+/* Admin */
+function openAdmin(){document.getElementById("adminModal").style.display="block";checkAdminSession()}
+function closeAdmin(){document.getElementById("adminModal").style.display="none"}
+function setAdminMsg(msg,type=""){const e=document.getElementById("adminMsg");if(e){e.className="admin-msg"+(type?" "+type:"");e.textContent=msg}}
+function setLoginMsg(msg,type=""){const e=document.getElementById("adminLoginMsg");e.className="admin-msg"+(type?" "+type:"");e.textContent=msg}
+async function checkAdminSession(){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session){currentAdminUser=null;isAdmin=false;document.getElementById("adminLogin").style.display="block";document.getElementById("adminPanel").style.display="none";return}
+ currentAdminUser=session.user;
+ const {data,error}=await sb.from("admin_users").select("user_id").eq("user_id",session.user.id).maybeSingle();
+ if(error||!data){isAdmin=false;await sb.auth.signOut();setLoginMsg("Tài khoản này không có quyền quản trị.","err");document.getElementById("adminLogin").style.display="block";document.getElementById("adminPanel").style.display="none";return}
+ isAdmin=true;document.getElementById("adminLogin").style.display="none";document.getElementById("adminPanel").style.display="block";
+ document.getElementById("adminIdentity").textContent="Quản trị: "+(session.user.email||session.user.id);
+ await loadDataFromSupabase();refreshAdminUI()
+}
+async function adminSignIn(){
+ const email=document.getElementById("adminEmail").value.trim(),password=document.getElementById("adminPassword").value;
+ if(!email||!password){setLoginMsg("Nhập đầy đủ email và mật khẩu.","err");return}
+ setLoginMsg("Đang đăng nhập...");
+ const {data,error}=await sb.auth.signInWithPassword({email,password});
+ if(error){setLoginMsg("Đăng nhập không thành công: "+error.message,"err");return}
+ currentAdminUser=data.user;await checkAdminSession();if(isAdmin)setLoginMsg("Đăng nhập thành công.","ok")
+}
+async function adminSignOut(){await sb.auth.signOut();currentAdminUser=null;isAdmin=false;document.getElementById("adminPanel").style.display="none";document.getElementById("adminLogin").style.display="block";document.getElementById("adminPassword").value="";setLoginMsg("Đã đăng xuất.","ok")}
+function refreshAdminUI(){
+ if(!isAdmin)return;
+ const list=document.getElementById("adminAreaList");if(!list)return;list.innerHTML="";
+ dbAreas.forEach(a=>{
+  const wrap=document.createElement("div");wrap.style.cssText="display:grid;grid-template-columns:1fr auto auto;gap:4px";
+  const b=document.createElement("button");b.textContent=a.name;b.className=a.id===selectedAdminAreaId?"active":"";b.onclick=()=>{selectedAdminAreaId=a.id;refreshAdminUI()};
+  const e=document.createElement("button");e.textContent="✏";e.title="Sửa";e.onclick=()=>editArea(a.id);
+  const d=document.createElement("button");d.textContent="🗑";d.title="Xóa";d.onclick=()=>deleteArea(a.id);
+  wrap.append(b,e,d);list.appendChild(wrap)
+ });
+ if(!selectedAdminAreaId&&dbAreas.length)selectedAdminAreaId=dbAreas[0].id;
+ const a=dbAreas.find(x=>x.id===selectedAdminAreaId);document.getElementById("adminCurrentArea").textContent=a?"Lĩnh vực: "+a.name:"Chưa chọn lĩnh vực.";
+ document.getElementById("taskAreaId").innerHTML=dbAreas.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");
+ renderAdminTasks()
+}
+function renderAdminTasks(){
+ const box=document.getElementById("adminTaskList"),tasks=dbTasks.filter(t=>t.area_id===selectedAdminAreaId);
+ if(!tasks.length){box.innerHTML='<div class="desc">Chưa có công việc trong lĩnh vực này.</div>';return}
+ box.innerHTML='<table class="admin-table"><thead><tr><th>Công việc</th><th>Biểu mẫu/Tài liệu</th><th>Thao tác</th></tr></thead><tbody>'+
+ tasks.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.template_name||"")}<br><span class="desc">${esc(t.reference_docs||"")}</span></td><td><button class="wh-smallbtn" onclick="editTask(${t.id})">Sửa</button> <button class="wh-smallbtn" onclick="deleteTask(${t.id})">Xóa</button></td></tr>`).join("")+"</tbody></table>"
+}
+function showAreaForm(){document.getElementById("areaFormBox").style.display="block";document.getElementById("areaFormTitle").textContent="Thêm lĩnh vực";document.getElementById("areaId").value="";document.getElementById("areaName").value="";document.getElementById("areaSort").value=dbAreas.length+1}
+function hideAreaForm(){document.getElementById("areaFormBox").style.display="none"}
+function editArea(id){const a=dbAreas.find(x=>x.id===id);if(!a)return;showAreaForm();document.getElementById("areaFormTitle").textContent="Sửa lĩnh vực";document.getElementById("areaId").value=a.id;document.getElementById("areaName").value=a.name;document.getElementById("areaSort").value=a.sort_order||0}
+async function saveArea(){
+ if(!isAdmin)return;const id=document.getElementById("areaId").value;
+ const payload={name:document.getElementById("areaName").value.trim(),sort_order:Number(document.getElementById("areaSort").value||0),updated_at:new Date().toISOString()};
+ if(!payload.name){setAdminMsg("Tên lĩnh vực không được để trống.","err");return}
+ const q=id?sb.from("ai_areas").update(payload).eq("id",id):sb.from("ai_areas").insert(payload);const {error}=await q;
+ if(error){setAdminMsg("Không lưu được lĩnh vực: "+error.message,"err");return}
+ hideAreaForm();await loadDataFromSupabase();setAdminMsg("Đã lưu lĩnh vực.","ok")
+}
+async function deleteArea(id){
+ if(!isAdmin)return;const a=dbAreas.find(x=>x.id===id);if(!a||!confirm('Xóa lĩnh vực "'+a.name+'" và toàn bộ công việc bên trong?'))return;
+ const {error}=await sb.from("ai_areas").delete().eq("id",id);if(error){setAdminMsg("Không xóa được lĩnh vực: "+error.message,"err");return}
+ if(selectedAdminAreaId===id)selectedAdminAreaId=null;await loadDataFromSupabase();setAdminMsg("Đã xóa lĩnh vực.","ok")
+}
+function showTaskForm(){
+ if(!dbAreas.length){setAdminMsg("Hãy tạo lĩnh vực trước.","err");return}
+ document.getElementById("taskFormBox").style.display="block";document.getElementById("taskFormTitle").textContent="Thêm công việc";document.getElementById("taskId").value="";
+ document.getElementById("taskAreaId").value=selectedAdminAreaId||dbAreas[0].id;document.getElementById("taskName").value="";document.getElementById("taskTemplate").value="";
+ document.getElementById("taskDocs").value="";document.getElementById("taskPrompt").value="";document.getElementById("taskSort").value=dbTasks.filter(t=>t.area_id===(selectedAdminAreaId||dbAreas[0].id)).length+1
+}
+function hideTaskForm(){document.getElementById("taskFormBox").style.display="none"}
+function editTask(id){const t=dbTasks.find(x=>x.id===id);if(!t)return;showTaskForm();document.getElementById("taskFormTitle").textContent="Sửa công việc";document.getElementById("taskId").value=t.id;document.getElementById("taskAreaId").value=t.area_id;document.getElementById("taskName").value=t.name||"";document.getElementById("taskTemplate").value=t.template_name||"";document.getElementById("taskDocs").value=t.reference_docs||"";document.getElementById("taskPrompt").value=t.ai_prompt||"";document.getElementById("taskSort").value=t.sort_order||0}
+async function saveTask(){
+ if(!isAdmin)return;const id=document.getElementById("taskId").value;
+ const payload={area_id:Number(document.getElementById("taskAreaId").value),name:document.getElementById("taskName").value.trim(),template_name:document.getElementById("taskTemplate").value.trim(),reference_docs:document.getElementById("taskDocs").value.trim(),ai_prompt:document.getElementById("taskPrompt").value.trim(),sort_order:Number(document.getElementById("taskSort").value||0),updated_at:new Date().toISOString()};
+ if(!payload.name){setAdminMsg("Tên công việc không được để trống.","err");return}
+ const q=id?sb.from("ai_tasks").update(payload).eq("id",id):sb.from("ai_tasks").insert(payload);const {error}=await q;
+ if(error){setAdminMsg("Không lưu được công việc: "+error.message,"err");return}
+ selectedAdminAreaId=payload.area_id;hideTaskForm();await loadDataFromSupabase();setAdminMsg("Đã lưu công việc.","ok")
+}
+async function deleteTask(id){
+ if(!isAdmin)return;const t=dbTasks.find(x=>x.id===id);if(!t||!confirm('Xóa công việc "'+t.name+'"?'))return;
+ const {error}=await sb.from("ai_tasks").delete().eq("id",id);if(error){setAdminMsg("Không xóa được công việc: "+error.message,"err");return}
+ await loadDataFromSupabase();setAdminMsg("Đã xóa công việc.","ok")
+}
+
+window.addEventListener("load",loadDataFromSupabase);
+</script>
+</body>
+</html>
