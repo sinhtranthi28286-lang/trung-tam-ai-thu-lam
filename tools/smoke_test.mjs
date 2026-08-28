@@ -4,7 +4,7 @@ const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
 page.on('pageerror',e=>errors.push('PAGE: '+e.message));
 page.on('console',m=>{if(m.type()==='error')errors.push('CONSOLE: '+m.text())});
-await page.goto('https://sinhtranthi28286-lang.github.io/trung-tam-ai-thu-lam/?smoke=830',{waitUntil:'domcontentloaded',timeout:45000});
+await page.goto('https://sinhtranthi28286-lang.github.io/trung-tam-ai-thu-lam/?smoke=831',{waitUntil:'domcontentloaded',timeout:45000});
 await page.waitForTimeout(6000);
 const result=await page.evaluate(async()=>{
  const out={version:document.querySelector('meta[name="thu-lam-version"]')?.content||'',checks:[]};
