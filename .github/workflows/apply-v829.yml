@@ -1,0 +1,26 @@
+name: Apply Trung tam AI V8.29
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-v829.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply V8.29
+        run: python tools/patch_v829.py
+      - name: Audit patched app
+        run: python tools/audit_center.py || true
+      - name: Commit website update and audit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v825/part*.txt AUDIT_REPORT.md
+          git commit -m "Update Trung tam AI V8.29: stability and shared persistence" || exit 0
+          git push
