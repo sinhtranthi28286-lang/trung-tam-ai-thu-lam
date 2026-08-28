@@ -1,0 +1,23 @@
+name: Apply Trung tam AI V8.30
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-v830.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python tools/patch_v830.py
+      - run: python tools/audit_center.py || true
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html v825/part*.txt AUDIT_REPORT.md
+          git commit -m "Update Trung tam AI V8.30: audit cleanup" || exit 0
+          git push
