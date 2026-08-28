@@ -1,0 +1,20 @@
+name: Inspect V8.28
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-v828.yml'
+permissions:
+  contents: write
+jobs:
+  inspect:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python tools/inspect_v828.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CODE_NOTES.md
+          git commit -m "Inspect V8.28 persistence and monthly functions" || exit 0
+          git push
