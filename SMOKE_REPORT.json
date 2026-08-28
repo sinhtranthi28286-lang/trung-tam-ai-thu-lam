@@ -1,0 +1,68 @@
+{
+  "result": {
+    "version": "8.30",
+    "checks": [
+      [
+        "render overview",
+        "PASS"
+      ],
+      [
+        "render staff",
+        "PASS"
+      ],
+      [
+        "render work",
+        "PASS"
+      ],
+      [
+        "render salary",
+        "PASS"
+      ],
+      [
+        "document lookup",
+        "PASS"
+      ],
+      [
+        "weekly report page",
+        "PASS"
+      ],
+      [
+        "monthly report page",
+        "FAIL",
+        "syncMonthlySheetTime is not defined"
+      ],
+      [
+        "monthly reload handler exists",
+        "PASS"
+      ],
+      [
+        "monthly open handler exists",
+        "PASS"
+      ],
+      [
+        "work modal",
+        "PASS"
+      ],
+      [
+        "salary modal",
+        "PASS"
+      ],
+      [
+        "directive modal",
+        "PASS"
+      ],
+      [
+        "meeting modal",
+        "PASS"
+      ]
+    ]
+  },
+  "errors": [
+    "CONSOLE: Failed to load resource: net::ERR_UNKNOWN_URL_SCHEME",
+    "CONSOLE: Failed to load resource: the server responded with a status of 401 ()",
+    "CONSOLE: Failed to load resource: the server responded with a status of 401 ()",
+    "CONSOLE: Failed to load resource: the server responded with a status of 401 ()",
+    "CONSOLE: Failed to load resource: the server responded with a status of 401 ()",
+    "CONSOLE: Refused to frame 'https://contacts.google.com/' because an ancestor violates the following Content Security Policy directive: \"frame-ancestors https://docs.google.com\".\n"
+  ]
+}
