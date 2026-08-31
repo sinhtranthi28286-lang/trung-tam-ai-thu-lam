@@ -1,0 +1,26 @@
+from pathlib import Path
+import base64,gzip,math,re
+P=Path('v825'); parts=[P/f'part{i:02d}.txt' for i in range(1,10)]
+s=gzip.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts))).decode('utf-8')
+js=r'''<script>
+// V8.42: free production OCR fallback for saved directive PDFs
+(function(){
+ const norm=t=>(t||'').replace(/\s+/g,' ').trim();
+ function pickTextArea(){return [...document.querySelectorAll('textarea')].find(x=>/Chọn văn bản đã lưu|Nội dung trích xuất/i.test(x.placeholder||'') || /trích xuất/i.test((x.previousElementSibling?.innerText||''))) || document.querySelector('#meetingDirectiveText,#directiveExtract,#directiveText');}
+ function selected(){const sels=[...document.querySelectorAll('select')];const el=sels.find(x=>/09-CT\/TU|Văn bản chỉ đạo/i.test(x.options?.[x.selectedIndex]?.text||''))||sels.find(x=>/văn bản/i.test(x.previousElementSibling?.innerText||'')); const v=el?.value; let d=null; try{d=(CTRL?.directives||[]).find(x=>String(x.id)==String(v))}catch(e){}; return d||{id:v};}
+ async function blobFor(d){const keys=[d?.id,d?.fileKey,d?.file_key,d?.object_key,d?.objectKey].filter(Boolean);for(const k of keys){try{if(typeof getDirectiveFileBlob==='function'){const z=await getDirectiveFileBlob(String(k));if(z instanceof Blob)return z;if(z?.blob instanceof Blob)return z.blob}}catch(e){console.warn('cloud blob',e)}}return null;}
+ async function ensureScript(src,test){if(test())return;await new Promise((ok,bad)=>{const q=document.createElement('script');q.src=src;q.onload=ok;q.onerror=bad;document.head.appendChild(q)});if(!test())throw new Error('Không tải được thư viện OCR');}
+ async function readPdf(blob,status){await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const ab=await blob.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:ab}).promise;let native='';for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const c=await p.getTextContent();native+='\n'+c.items.map(x=>x.str).join(' ')}if(norm(native).length>=80)return native.trim();
+ await ensureScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);status.textContent='PDF scan: đang khởi tạo OCR tiếng Việt...';const worker=await Tesseract.createWorker(['vie','eng'],1,{logger:m=>{if(m.status==='recognizing text')status.textContent='Đang OCR: '+Math.round((m.progress||0)*100)+'%'}});let out='';try{for(let i=1;i<=pdf.numPages;i++){status.textContent=`Đang OCR trang ${i}/${pdf.numPages}...`;const p=await pdf.getPage(i);const vp=p.getViewport({scale:2.25});const cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);await p.render({canvasContext:cv.getContext('2d',{willReadFrequently:true}),viewport:vp}).promise;const r=await worker.recognize(cv);out+='\n\n--- Trang '+i+' ---\n'+(r.data?.text||'')}}finally{await worker.terminate()}return out.trim();}
+ async function run(){const ta=pickTextArea();if(!ta)throw new Error('Không tìm thấy ô Nội dung trích xuất');const status=[...document.querySelectorAll('div,p,span')].find(x=>/^Đã đọc:|^PDF scan:|^Đang OCR/i.test(x.textContent.trim()))||ta.parentElement?.nextElementSibling||document.body;const d=selected();status.textContent='Đang lấy file PDF đã lưu...';const blob=await blobFor(d);if(!blob)throw new Error('Không lấy được file PDF từ kho lưu trữ.');const text=await readPdf(blob,status);if(norm(text).length<40)throw new Error('OCR chưa nhận đủ nội dung. Hãy kiểm tra chất lượng bản scan.');ta.value=text;ta.dispatchEvent(new Event('input',{bubbles:true}));ta.dispatchEvent(new Event('change',{bubbles:true}));window.__thuLamDirectiveExtract=text;status.textContent='Đã đọc đầy đủ: '+text.length.toLocaleString('vi-VN')+' ký tự. Có thể bấm “Phân tích & đề xuất giao việc”.';}
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!/^\s*📖?\s*Đọc văn bản đã lưu/i.test(b.textContent||''))return;e.preventDefault();e.stopImmediatePropagation();b.disabled=true;run().catch(err=>{console.error(err);alert('Không đọc được văn bản: '+err.message)}).finally(()=>b.disabled=false)},true);
+})();
+</script>'''
+# place before body close, after existing code so capture listener takes precedence
+s=s.replace('</body>',js+'\n</body>',1)
+s=re.sub(r'<meta name="thu-lam-version" content="[^"]+">','<meta name="thu-lam-version" content="8.42">',s,count=1)
+s=s.replace('Bản V6 này là bản thử nghiệm chạy ngay trong trình duyệt, dùng quy tắc/từ khóa nghiệp vụ để mô phỏng bước “AI phân loại”. Khi đưa lên web dùng chung, có thể nối mô hình AI thật để đọc và hiểu văn bản tốt hơn.','Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.')
+packed=base64.b64encode(gzip.compress(s.encode(),9)).decode(); chunk=math.ceil(len(packed)/9)
+for i,p in enumerate(parts):p.write_text(packed[i*chunk:(i+1)*chunk])
+idx=Path('index.html');x=idx.read_text();x=re.sub(r"f\+'\?v=\d+'","f+'?v=842'",x);idx.write_text(x)
+print('V8.42 free OCR reader installed')
