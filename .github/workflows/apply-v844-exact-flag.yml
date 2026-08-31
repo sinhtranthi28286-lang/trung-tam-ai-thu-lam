@@ -1,0 +1,26 @@
+name: Apply V8.44 exact Party flag
+on:
+  push:
+    paths:
+      - 'assets/co-dang-chuan.b64.part*'
+      - 'tools/patch_v844_exact_flag.py'
+      - '.github/workflows/apply-v844-exact-flag.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply exact uploaded flag image
+        run: python tools/patch_v844_exact_flag.py
+      - name: Commit generated app and PNG
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html v825/part*.txt assets/co-dang-chuan.png
+          git diff --cached --quiet || git commit -m 'V8.44 use exact uploaded Party flag image'
+          git push
