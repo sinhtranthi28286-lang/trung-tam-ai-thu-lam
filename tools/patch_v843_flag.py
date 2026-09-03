@@ -3,6 +3,7 @@ import base64,gzip,math,re
 
 # Rebuild the exact Party flag PNG from the preserved base64 chunks.
 b64=''.join(Path(f'assets/co-dang-chuan.b64.part{i}').read_text().strip() for i in range(1,8))
+b64 += '=' * (-len(b64) % 4)
 img=base64.b64decode(b64)
 Path('assets/co-dang-chuan.png').write_bytes(img)
 
@@ -10,12 +11,10 @@ P=Path('v825'); parts=[P/f'part{i:02d}.txt' for i in range(1,10)]
 s=gzip.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts))).decode('utf-8')
 asset='https://sinhtranthi28286-lang.github.io/trung-tam-ai-thu-lam/assets/co-dang-chuan.png?v=847'
 
-# Remove every older flag override first.
 for v in ('v843','v844','v845','v846','v847'):
     s=re.sub(rf'<style id="{v}-party-flag-fix">.*?</style>','',s,flags=re.S)
     s=re.sub(rf'<script id="{v}-party-flag-runtime">.*?</script>','',s,flags=re.S)
 
-# Point all Party-emblem image references to the exact uploaded PNG.
 s=re.sub(r'assets/co-dang-chuan(?:\.png|\.svg)(?:\?v=\d+)?',asset,s)
 s=re.sub(r'(<img\b[^>]*\bsrc=["\'])([^"\']*(?:bua|liem|party|co-dang|logo-dang)[^"\']*)(["\'][^>]*>)',lambda m:m.group(1)+asset+m.group(3),s,flags=re.I)
 s=s.replace('☭',f'<img src="{asset}" alt="Cờ Đảng" class="v847-party-flag-img">')
@@ -27,7 +26,6 @@ css=f'''<style id="v847-party-flag-fix">
 </style>'''
 s=s.replace('</head>',css+'\n</head>',1)
 
-# Apply to both login screen and the main banner, including elements rendered later.
 js=f'''<script id="v847-party-flag-runtime">
 (()=>{{
  const SRC='{asset}';
@@ -40,7 +38,7 @@ js=f'''<script id="v847-party-flag-runtime">
      const src=(img.getAttribute('src')||'').toLowerCase();
      const cls=(img.className||'').toString().toLowerCase();
      if(!(alt.includes('cờ đảng')||alt.includes('co dang')||src.includes('co-dang-chuan')||cls.includes('party-flag'))) return;
-     if(img.src!==SRC) img.src=SRC;
+     img.src=SRC;
      img.style.setProperty('display','block','important');
      img.style.setProperty('width','100%','important');
      img.style.setProperty('height','100%','important');
