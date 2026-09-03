@@ -1,31 +1,30 @@
 from pathlib import Path
 import base64,gzip,math,re
 
-b64=''.join(Path(f'assets/co-dang-chuan.b64.part{i}').read_text().strip() for i in range(1,8))
-b64 += '=' * (-len(b64) % 4)
-img=base64.b64decode(b64)
-Path('assets/co-dang-chuan.png').write_bytes(img)
-
+# IMPORTANT: assets/co-dang-chuan.png is the exact original PNG supplied by the user.
+# Do not rebuild, trace, redraw, or overwrite it from old base64 chunks.
 P=Path('v825'); parts=[P/f'part{i:02d}.txt' for i in range(1,10)]
 s=gzip.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts))).decode('utf-8')
-asset='https://sinhtranthi28286-lang.github.io/trung-tam-ai-thu-lam/assets/co-dang-chuan.png?v=848'
+asset='assets/co-dang-chuan.png?v=849'
 
-for v in ('v843','v844','v845','v846','v847','v848'):
+# Remove every previous flag-only override so there is one authoritative implementation.
+for v in ('v843','v844','v845','v846','v847','v848','v849'):
     s=re.sub(rf'<style id="{v}-party-flag-fix">.*?</style>','',s,flags=re.S)
     s=re.sub(rf'<script id="{v}-party-flag-runtime">.*?</script>','',s,flags=re.S)
 
-s=re.sub(r'(?:https://sinhtranthi28286-lang\.github\.io/trung-tam-ai-thu-lam/)?assets/co-dang-chuan(?:\.png|\.svg)(?:\?v=\d+)?',asset,s)
+# Point all known Party-flag references directly to the original PNG (never through SVG).
+s=re.sub(r'(?:https://sinhtranthi28286-lang\.github\.io/trung-tam-ai-thu-lam/)?assets/co-dang-chuan(?:-v\d+)?(?:\.png|\.svg)(?:\?v=\d+)?',asset,s)
 s=re.sub(r'(<img\b[^>]*\bsrc=["\'])([^"\']*(?:bua|liem|party|co-dang|logo-dang)[^"\']*)(["\'][^>]*>)',lambda m:m.group(1)+asset+m.group(3),s,flags=re.I)
-s=s.replace('☭',f'<img src="{asset}" alt="Cờ Đảng" class="v848-party-flag-img">')
+s=s.replace('☭',f'<img src="{asset}" alt="Cờ Đảng" class="v849-party-flag-img">')
 
-css=f'''<style id="v848-party-flag-fix">
-.v848-party-flag-img,img[src*="co-dang-chuan.png"]{{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important;object-position:center center!important;margin:0!important;padding:0!important;background:#df291f!important}}
+css=f'''<style id="v849-party-flag-fix">
+.v849-party-flag-img,img[src*="co-dang-chuan.png"]{{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important;object-position:center center!important;margin:0!important;padding:0!important;background:#df291f!important}}
 .party-emblem,.party-logo,.dang-emblem,.dang-logo{{background-image:url('{asset}')!important;background-size:contain!important;background-position:center center!important;background-repeat:no-repeat!important;background-color:#df291f!important;color:transparent!important;overflow:hidden!important}}
 .party-emblem>*,.party-logo>*,.dang-emblem>*,.dang-logo>*{{visibility:hidden!important}}
 </style>'''
 s=s.replace('</head>',css+'\n</head>',1)
 
-js=f'''<script id="v848-party-flag-runtime">
+js=f'''<script id="v849-party-flag-runtime">
 (()=>{{
  const SRC='{asset}';
  function apply(root=document){{
@@ -59,8 +58,8 @@ js=f'''<script id="v848-party-flag-runtime">
 </script>'''
 s=s.replace('</body>',js+'\n</body>',1)
 
-s=re.sub(r'<meta name="thu-lam-version" content="[^"]+">','<meta name="thu-lam-version" content="8.48">',s,count=1)
+s=re.sub(r'<meta name="thu-lam-version" content="[^"]+">','<meta name="thu-lam-version" content="8.49">',s,count=1)
 packed=base64.b64encode(gzip.compress(s.encode(),9)).decode(); chunk=math.ceil(len(packed)/9)
 for i,p in enumerate(parts): p.write_text(packed[i*chunk:(i+1)*chunk])
-idx=Path('index.html'); x=idx.read_text(); x=re.sub(r"f\+'\?v=\d+'","f+'?v=848'",x); idx.write_text(x)
-print('V8.48 exact Party flag restored; bytes=',len(img))
+idx=Path('index.html'); x=idx.read_text(); x=re.sub(r"f\+'\?v=\d+'","f+'?v=849'",x); idx.write_text(x)
+print('V8.49 exact original Party flag PNG referenced directly')
