@@ -17,7 +17,7 @@ html,body{margin:0;height:100%;font-family:Segoe UI,Arial,sans-serif;background:
   try{
     const files=[1,2,3,4,5,6,7,8,9].map(n=>'v825/part'+String(n).padStart(2,'0')+'.txt');
     const parts=await Promise.all(files.map(async f=>{
-      const r=await fetch(f+'?v=849',{cache:'no-store'});
+      const r=await fetch(f+'?v=850',{cache:'no-store'});
       if(!r.ok) throw new Error('Không tải được '+f+' ('+r.status+')');
       return (await r.text()).trim();
     }));
