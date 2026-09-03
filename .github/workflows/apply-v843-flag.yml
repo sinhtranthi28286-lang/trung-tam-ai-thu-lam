@@ -1,9 +1,10 @@
-name: Apply V8.43 Party flag
+name: Apply Party flag fix
 on:
   push:
     paths:
       - 'tools/patch_v843_flag.py'
-      - 'assets/co-dang-chuan.svg'
+      - 'assets/co-dang-chuan.b64.part*'
+      - 'assets/co-dang-chuan.png'
       - '.github/workflows/apply-v843-flag.yml'
 permissions:
   contents: write
@@ -15,12 +16,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Apply flag-only patch
+      - name: Rebuild exact Party flag and patch app
         run: python tools/patch_v843_flag.py
-      - name: Commit generated app
+      - name: Commit generated app and exact PNG
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html v825/part*.txt
-          git diff --cached --quiet || git commit -m 'V8.43 update Party flag visual only'
+          git add index.html v825/part*.txt assets/co-dang-chuan.png
+          git diff --cached --quiet || git commit -m 'V8.47 restore exact Party flag image'
           git push
