@@ -1,0 +1,1463 @@
+
+===== Đã phân tích văn bản. Phát hiện =====
+
+ên truyền','học tập và làm theo','lý luận chính trị','bản tin','báo chí','không gian mạng']},
+ {area:'Phụ trách chung',keys:['báo cáo chung','tổng hợp chung','chương trình công tác','kế hoạch chung','kết luận họp ban','tham mưu tổng hợp']},
+];
+
+function aiStaffForArea(area){
+ const exact=TT_STAFF_WORK.filter(x=>x.area===area);
+ return exact.length?exact:TT_STAFF_WORK.filter(x=>String(x.area||'').toLowerCase().includes(String(area||'').toLowerCase().replace('phụ trách ','')));
+}
+function splitAITasks(text){
+ let raw=String(text||'').replace(/\r/g,'\n').replace(/\n{2,}/g,'\n').trim();
+ if(!raw)return [];
+ let lines=raw.split('\n').map(x=>x.trim()).filter(Boolean);
+ let candidates=[];
+ lines.forEach(line=>{
+   let cleaned=line.replace(/^[\-\+\•\*\d\.\)\(]+\s*/,'').trim();
+   if(cleaned.length<18)return;
+   if(/^(căn cứ|kính gửi|nơi nhận|đảng cộng sản|ủy ban|ban xây dựng|số:|ngày)/i.test(cleaned))return;
+   if(/(giao|đề nghị|yêu cầu|thực hiện|tham mưu|rà soát|tổng hợp|báo cáo|triển khai|hoàn thành|phối hợp|ban hành|xây dựng|chuẩn bị|đôn đốc)/i.test(cleaned)){
+     candidates.push(cleaned)
+   }
+ });
+ if(!candidates.length){
+   const sentences=raw.split(/(?<=[\.\;\:])\s+/).map(x=>x.trim()).filter(x=>x.length>30);
+   candidates=sentences.filter(x=>/(giao|đề nghị|yêu cầu|thực hiện|tham mưu|rà soát|tổng hợp|báo cáo|triển khai|hoàn thành|phối hợp|ban hành|xây dựng|chuẩn bị|đôn đốc)/i.test(x));
+ }
+ return [...new Set(candidates)].slice(0,30);
+}
+function classifyAITask(task){
+ let t=task.toLowerCase(),best={area:'',score:0};
+ AI_RULES.forEach(r=>{let score=r.keys.reduce((n,k)=>n+(t.includes(k)?1:0),0);if(score>best.score)best={area:r.area,score}});
+ if(!best.area){
+   const staffHit=TT_STAFF_WORK.find(x=>String(x.area||'').split(',').some(k=>k.length>4&&t.includes(k.toLowerCase().trim())));
+   if(staffHit)best={area:staffHit.area,score:1}
+ }
+ return best
+}
+function inferAIProduct(task){
+ const t=task.toLowerCase();
+ if(t.includes('báo cáo'))return 'Báo cáo';
+ if(t.includes('quyết định')||t.includes('ban hành quyết định'))return 'Dự thảo/Quyết định';
+ if(t.includes('kế hoạch'))return 'Kế hoạch';
+ if(t.includes('công văn'))return 'Công văn';
+ if(t.includes('tờ trình'))return 'Tờ trình';
+ if(t.includes('tổng hợp'))return 'Bảng/Danh sách tổng hợp';
+ if(t.includes('rà soát'))return 'Kết quả rà soát/Tổng hợp';
+ if(t.includes('tham mưu'))return 'Dự thảo văn bản tham mưu';
+ return '[CẦN LÃNH ĐẠO XÁC ĐỊNH]'
+}
+function inferAIDeadline(task,fullText){
+ const txt=task+' '+fullText;
+ let m=txt.match(/(?:trước|chậm nhất|hoàn thành trước)\s+(?:ngày\s*)?(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i);
+ if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+ let m2=txt.match(/ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/i);
+ if(m2)return `${m2[3]}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
+ return ''
+}
+function sourceExcerpt(task,text){
+ let idx=text.toLowerCase().indexOf(task.toLowerCase().slice(0,30));
+ if(idx<0)return task.slice(0,240);
+ return text.slice(Math.max(0,idx-80),Math.min(text.length,idx+task.length+120)).replace(/\n+/g,' ')
+}
+async function readAIDocument(){
+ const f=aiDocFile.files?.[0];
+ if(!f)return alert('Chọn file PDF hoặc DOCX.');
+ aiReadStatus.textContent='Đang đọc văn bản...';
+ try{
+   let text='';
+   if(f.name.toLowerCase().endsWith('.pdf')){
+     if(!window.pdfjsLib)throw new Error('Chưa tải được thư viện đọc PDF.');
+     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+     const buf=await f.arrayBuffer(),pdf=await pdfjsLib.getDocument({data:buf}).promise;
+     let parts=[];
+     for(let i=1;i<=pdf.numPages;i++){
+       const page=await pdf.getPage(i),content=await page.getTextContent();
+       parts.push(content.items.map(x=>x.str).join(' '))
+     }
+     text=parts.join('\n')
+   }else if(f.name.toLowerCase().endsWith('.docx')){
+     if(!window.mammoth)throw new Error('Chưa tải được thư viện đọc Word.');
+     const buf=await f.arrayBuffer(),res=await mammoth.extractRawText({arrayBuffer:buf});
+     text=res.value||''
+   }else throw new Error('Bản thử nghiệm hỗ trợ PDF và DOCX.');
+   aiDocText.value=text.trim();
+   aiReadStatus.innerHTML=`<b>Đã đọc:</b> ${ce(f.name)} • ${text.length.toLocaleString('vi-VN')} ký tự.`;
+ }catch(e){console.error(e);aiReadStatus.textContent='Không đọc được file: '+e.message}
+}
+function analyzeAIDocument(){
+ const text=aiDocText.value.trim();if(!text)return alert('Chưa có nội dung văn bản để phân tích.');
+ const tasks=splitAITasks(text);
+ AI_PROPOSALS=tasks.map((task,i)=>{
+   const cls=classifyAITask(task),people=aiStaffForArea(cls.area),lead=people[0]?.name||'',coord=people.slice(1).map(x=>x.name).join(', ');
+   return {id:Date.now()+i,selected:true,task,area:cls.area||'[CẦN XÁC ĐỊNH]',lead,coord,product:inferAIProduct(task),due:inferAIDeadline(task,text),source:sourceExcerpt(task,text),review:!cls.area||!lead}
+ });
+ renderAIProposals();
+ aiReadStatus.innerHTML=`Đã phân tích văn bản. Phát hiện <b>${AI_PROPOSALS.length}</b> nội dung có dấu hiệu là nhiệm vụ cần theo dõi.`
+}
+function renderAIProposals(){
+ aiTaskCount.textContent=AI_PROPOSALS.length;
+ aiNeedReview.textContent=AI_PROPOSALS.filter(x=>x.review||!x.lead).length;
+ aiHasDeadline.textContent=AI_PROPOSALS.filter(x=>x.due).length;
+ const staffOptions=TT_STAFF_WORK.map(x=>`<option>${ce(x.name)}</option>`).join('');
+ aiAssignRows.innerHTML=AI_PROPOSALS.map((x,i)=>`<tr>
+   <td><input type="checkbox" ${x.selected?'checked':''} onchange="AI_PROPOSALS[${i}].selected=this.checked"></td>
+   <td>${ce(x.task)}</td>
+   <td><input class="ai-inline-input" value="${ce(x.area)}" onchange="AI_PROPOSALS[${i}].area=this.value"></td>
+   <td>
+     <select class="ai-inline-select ai-person-select" onchange="AI_PROPOSALS[${i}].lead=this.value;AI_PROPOSALS[${i}].review=!this.value;renderAIProposals()">
+       <option value="">-- Lãnh đạo chọn người thực hiện --</option>
+       ${TT_STAFF_WORK.map(p=>`<option ${p.name===x.lead?'selected':''}>${ce(p.name)}</option>`).join('')}
+     </select>
+     ${x.lead?`<div class="ai-ok">Đang chọn: ${ce(x.lead)}</div>`:'<div class="ai-review">Chưa chọn người thực hiện</div>'}
+   </td>
+   <td><input class="ai-inline-input" value="${ce(x.coord)}" onchange="AI_PROPOSALS[${i}].coord=this.value"></td>
+   <td><input class="ai-inline-input" value="${ce(x.product)}" onchange="AI_PROPOSALS[${i}].product=this.value"></td>
+   <td><input type="date" class="ai-inline-input" value="${ce(x.due)}" onchange="AI_PROPOSALS[${i}].due=this.value"></td>
+   <td><button class="ai-source-btn" onclick="showAISource(${i})">Xem căn cứ</button></td>
+ </tr>`).join('')
+}
+function showAISource(i){
+ const x=AI_PROPOSALS[i];alert('Đoạn văn bản làm căn cứ:\n\n'+(x?.source||''))
+}
+function clearAIAnalysis(){AI_PROPOSALS=[];aiDocText.value='';aiAssignRows.innerHTML='';aiTaskCount.textContent=aiNeedReview.textContent=aiHasDeadline.textContent='0';syncSelectedDirectiveInfo()}
+function approveAIAssignments(){
+ if(!AI_PROPOSALS.length)return alert('Chưa có đề xuất giao việc.');
+ const chosen=AI_PROPOSALS.filter(x=>x.selected);
+ if(!chosen.length)return alert('Chưa chọn nhiệm vụ nào.');
+ const unresolved=chosen.filter(x=>!x.lead||!x.area||x.area.startsWith('['));
+ if(unresolved.length){
+   alert(`Còn ${unresolved.length} nhiệm vụ chưa được lãnh đạo chọn người thực hiện hoặc chưa xác định lĩnh vực. Vui lòng hoàn thiện trước khi duyệt.`);
+   return;
+ }
+ let count=0;
+ chosen.filter(x=>x.lead&&x.area&&!x.area.startsWith('[')).forEach(x=>{
+   CTRL.work.push({
+     id:Date.now()+count,owner:x.lead,area:x.area,type:'Văn bản chỉ đạo - AI đề xuất',
+     priority:'Bình thường',task:x.task,product:x.product,inNo:aiDocNo.value.trim(),
+     inputFile:(CTRL.directives.find(v=>v.id===Number(aiDirectiveSelect.value))?.file||''),start:new Date().toISOString().slice(0,10),
+     due:x.due,status:'Chưa thực hiện',progress:0,outNo:'',outDate:'',result:'',
+     resultNote:x.coord?('Phối hợp: '+x.coord):''
+   });count++
+ });
+ csave();alert(`Đã duyệt và giao ${count} nhiệm vụ vào Dashboard.`);
+ openCtrl('work')
+}
+</script>
+
+<script>
+const oldRenderCtrlAllV7=renderCtrlAll;
+renderCtrlAll=function(){
+  oldRenderCtrlAllV7();
+  refreshAIDirectiveSelect();
+  renderRecentDirectives();
+  if(typeof buildDirectiveSummary==='function')buildDirectiveSummary();
+}
+window.addEventListener('load',()=>{
+  refreshAIDirectiveSelect();
+  renderRecentDirectives();
+});
+</script>
+
+<script>
+function setLeftActive(btn,title){
+ document.querySelectorAll('.tt-left-item').forEach(x=>x.classList.remove('active'));
+ if(btn)btn.classList.add('active');
+ if(window.ttMobileTitle)ttMobileTitle.textContent=title||btn?.textContent?.trim()||'Trung tâm AI';
+ if(window.innerWidth<=900)document.getElementById('ttLeftMenu')?.classList.remove('mobile-open');
+}
+function hideCenterPages(){
+ ['overview','staff','staffWork','aiwork','libraryTop','sheetPage','monthReportPage'].forEach(id=>{
+   const el=document.getElementById(id);if(el)el.style.display='none';
+ });
+ const main=document.querySelector('.main');if(main)main.style.display='none';
+}
+function showCenterPage(page,btn){
+ const map={overview:'overview',staff:'staff',staffWork:'staffWork',sheet:'weeklyReport',monthreport:'monthlyReport',ai:'ai',library:'lookup'};
+ if(map[page]&&!requirePerm(map[page]))return;
+ hideCenterPages();
+ if(page==='overview'){
+   overview.style.display='block';setLeftActive(btn,'Tổng quan');
+ }else if(page==='staff'){
+   staff.style.display='block';setLeftActive(btn,'Danh sách cán bộ');
+ }else if(page==='staffWork'){
+   staffWork.style.display='block';setLeftActive(btn,'Theo dõi công việc');
+ }else if(page==='sheet'){
+   sheetPage.style.display='block';setLeftActive(btn,'Báo cáo tuần');
+ }else if(page==='monthreport'){
+   monthReportPage.style.display='block';
+   syncMonthlySheetTime();
+   setLeftActive(btn,'Báo cáo tháng');
+ }else if(page==='ai'){
+   aiwork.style.display='block';
+   const main=document.querySelector('.main');if(main)main.style.display='grid';
+   if(window.ttAiContent)ttAiContent.style.display='block';
+   if(window.ttAiToggle)ttAiToggle.textContent='Thu gọn ứng dụng AI ▴';
+   setLeftActive(btn,'AI theo lĩnh vực');
+ }else if(page==='library'){
+   libraryTop.style.display='block';renderDocumentLookup();setLeftActive(btn,'Tra cứu văn bản');
+ }
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function openLeftCtrl(panel,btn){
+ const map={work:'work',directives:'directives',report:'report',meeting:'meeting',salary:'salary'};
+ if(map[panel]&&!requirePerm(map[panel]))return;
+ setLeftActive(btn,btn?.textContent?.trim());
+ openCtrl(panel);
+}
+
+
+function reloadEmbeddedSheet(){
+ const f=document.getElementById('reportSheetFrame');
+ if(f)f.src=f.src;
+}
+function openOriginalSheet(){
+ window.open('https://docs.google.com/spreadsheets/d/1dnHvYauhrTaux2uNsh5hfy5qRr_KJygomD_RD0Ul7qk/edit?gid=636727831#gid=636727831','_blank');
+}
+
+function toggleLeftMenu(){document.getElementById('ttLeftMenu')?.classList.toggle('mobile-open')}
+window.addEventListener('load',async()=>{
+ await loadCurrentAppUser();
+ // Trang khởi động chỉ hiển thị Theo dõi công việc
+ hideCenterPages();
+ if(window.staffWork)staffWork.style.display='block';
+ const b=document.querySelector('.tt-left-item[data-page="staffWork"]');
+ setLeftActive(b,'Theo dõi công việc');
+});
+</script>
+
+<script>
+function dlNorm(v){return String(v??'').trim()}
+function dlEsc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function dlIncomingDocs(){
+ const dirs=(typeof CTRL!=='undefined'&&Array.isArray(CTRL.directives))?CTRL.directives:[];
+ return dirs.map(d=>({id:d.id,type:'in',area:dlNorm(d.area)||'Chưa phân lĩnh vực',no:dlNorm(d.no||d.number||d.code),date:dlNorm(d.date),title:dlNorm(d.title||d.subject||d.summary||d.content),actor:dlNorm(d.agency||d.issuer||d.from)||'Văn bản chỉ đạo'}));
+}
+function dlOutgoingDocs(){
+ const works=(typeof CTRL!=='undefined'&&Array.isArray(CTRL.work))?CTRL.work:[];
+ return works.filte
+
+===== Nhiệm vụ/Văn bản =====
+
+on class="btn dark" onclick="ai('https://chatgpt.com/')">ChatGPT</button>
+      <button class="btn light" onclick="ai('https://copilot.microsoft.com/')">Copilot</button>
+      <button class="btn light" onclick="ai('https://gemini.google.com/')">Gemini</button>
+    </div>
+    <div class="desc">Kho nghiệp vụ số được tích hợp trực tuyến, cán bộ có thể sử dụng ngay trên trình duyệt.</div>
+  </div>
+</div>
+
+<div id="libraryTop" class="card library">
+<h2>🔎 TRA CỨU VĂN BẢN</h2>
+<div class="desc" style="margin-bottom:10px">Hệ thống tự tổng hợp <b>📥 Văn bản đến</b> từ Văn bản chỉ đạo và <b>📤 Văn bản đi</b> từ Công việc &amp; văn bản. Văn bản đi đã thực hiện có thể <b>xem, tải, sửa, xóa</b> trực tiếp tại đây.</div>
+
+<div class="doc-lookup-summary">
+ <div><b id="dlTotal">0</b><span>Tổng văn bản</span></div>
+ <div><b id="dlIncoming">0</b><span>📥 Văn bản đến</span></div>
+ <div><b id="dlOutgoing">0</b><span>📤 Văn bản đi</span></div>
+ <div><b id="dlAreas">0</b><span>Lĩnh vực</span></div>
+</div>
+<div class="doc-lookup-filter">
+ <div class="dl-search"><label>Tìm kiếm</label><input id="dlSearch" placeholder="Số/ký hiệu, trích yếu, nội dung, cán bộ..." oninput="renderDocumentLookup()"></div>
+ <div><label>Loại văn bản</label><select id="dlType" onchange="renderDocumentLookup()"><option value="">Tất cả</option><option value="in">📥 Văn bản đến</option><option value="out">📤 Văn bản đi</option></select></div>
+ <div><label>Lĩnh vực</label><select id="dlArea" onchange="renderDocumentLookup()"><option value="">Tất cả lĩnh vực</option></select></div>
+ <div><label>Thời gian</label><select id="dlPeriod" onchange="renderDocumentLookup()"><option value="">Tất cả</option><option value="month">Tháng này</option><option value="year">Năm nay</option></select></div>
+</div>
+<div id="dlAreaChips" class="dl-area-chips"></div>
+<div class="doc-lookup-table-wrap">
+<table class="doc-lookup-table"><thead><tr><th>STT</th><th>Loại</th><th>Lĩnh vực</th><th>Số/Ký hiệu</th><th>Ngày</th><th>Nội dung/Trích yếu</th><th>Cán bộ/Đơn vị</th><th>Tệp/Thao tác</th></tr></thead><tbody id="dlBody"></tbody></table>
+</div>
+</div>
+</div>
+
+
+<div class="tt-bottom-red-decor" aria-hidden="true">
+  <div class="tt-bottom-drum"></div>
+  <div class="tt-bottom-lotus">❀</div>
+</div>
+<footer>★ ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM ★ &nbsp; | &nbsp; Trung tâm AI – Ban Xây dựng Đảng xã Thư Lâm</footer>
+
+
+<div id="ctrlModal" class="ctrl-modal"><div class="ctrl-box">
+ <div class="ctrl-head"><h2 id="ctrlTitle">TRUNG TÂM ĐIỀU HÀNH</h2><button class="ctrl-close" onclick="closeCtrl()">Đóng ✕</button></div>
+ <div class="ctrl-tabs">
+  <button class="ctrl-tab" data-c="meeting" onclick="switchCtrl('meeting')">📝 Kết luận họp</button>
+  <button class="ctrl-tab" data-c="aiassign" onclick="switchCtrl('aiassign')">📥🤖 AI giao việc</button>
+  <button class="ctrl-tab" data-c="work" onclick="switchCtrl('work')">📊 Công việc & văn bản</button>
+  <button class="ctrl-tab" data-c="directives" onclick="switchCtrl('directives')">📣 Văn bản chỉ đạo</button><button class="ctrl-tab" data-c="salary" onclick="switchCtrl('salary')">💰 Nâng lương</button>
+ </div>
+
+ <div id="c-meeting" class="ctrl-pane">
+  <div class="ctrl-note"><b>Nguyên tắc:</b> hệ thống chỉ sắp xếp nội dung đã nhập, không tự tạo số liệu, căn cứ, tên người hoặc mốc thời gian. Chỗ thiếu được đánh dấu [CẦN BỔ SUNG].</div>
+  <div class="ctrl-form">
+   <div><label>Ngày họp</label><input id="mhDate" type="date"></div><div><label>Địa điểm</label><input id="mhPlace"></div><div><label>Chủ trì</label><select id="mhChair"></select></div><div><label>Thư ký</label><select id="mhSec"></select></div>
+   <div class="span2"><label>Thành phần dự họp</label><textarea id="mhAttend">Các thành viên trong Ban Xây dựng Đảng</textarea></div><div class="span2"><label>I. NỘI DUNG CUỘC HỌP</label><textarea id="mhAgenda"></textarea></div>
+   <div class="full"><label>1. Đánh giá kết quả thực hiện nhiệm vụ tuần/tháng trước</label><textarea id="mhDiscuss"></textarea></div>
+   <div class="full"><label>2. Triển khai nhiệm vụ tuần/tháng sau và kết luận giao nhiệm vụ</label><textarea id="mhGeneral"></textarea></div>
+   <div><label>Nhiệm vụ giao</label><input id="mhTask"></div><div><label>Người/Bộ phận thực hiện</label><input id="mhOwner"></div><div><label>Kết quả/Sản phẩm phải hoàn thành</label><input id="mhProduct"></div><div><label>Thời hạn</label><input id="mhDue" type="date"></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="addMeetingTask()">＋ Thêm nhiệm vụ vào kết luận</button><button class="btn light" onclick="makeConclusion()">Tạo dự thảo Kết luận</button><button class="btn primary" type="button" onclick="saveMeetingNotice()">💾 Lưu Thông báo kết luận</button><button class="btn light admin-export-only" type="button" onclick="exportCurrentMeetingNoticeWord()">📄 Xuất Word Thông báo</button><button class="btn light" onclick="copyConclusion()">Sao chép</button></div>
+  <div style="overflow:auto"><table class="ctrl-table"><thead><tr><th>STT</th><th>Nhiệm vụ/Văn bản</th><th>Người thực hiện</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th></th></tr></thead><tbody id="meetingTaskRows"></tbody></table></div>
+  <textarea id="mhOutput" class="ctrl-output" readonly></textarea>
+ </div>
+
+ 
+ 
+<div id="meetingNoticePanel" style="margin-top:16px;border-top:1px solid #ead8c7;padding-top:12px">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0;color:#a82619">📚 THÔNG BÁO KẾT LUẬN ĐÃ LƯU</h3><span style="font-size:12px;color:#73584a">Lưu dùng chung để theo dõi, mở lại và xuất Word.</span></div>
+ <div style="overflow:auto;margin-top:8px"><table class="ctrl-table"><thead><tr><th>STT</th><th>Số/Ký hiệu</th><th>Ngày họp</th><th>Nội dung</th><th>Chủ trì</th><th>Số nhiệm vụ</th><th>Thao tác</th></tr></thead><tbody id="meetingNoticeRows"></tbody></table></div>
+</div>
+<div id="c-aiassign" class="ctrl-pane">
+  <div class="ctrl-note"><b>Quy trình thử nghiệm:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc tệp đã lưu → phân tích theo từ khóa nghiệp vụ và lĩnh vực đã phân công → đề xuất người chủ trì/phối hợp, sản phẩm và thời hạn nếu văn bản có nêu. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b></div>
+  <div class="ctrl-form">
+    <div class="span2"><label>Chọn văn bản đã lưu tại mục Văn bản chỉ đạo</label><select id="aiDirectiveSelect" onchange="syncSelectedDirectiveInfo()"></select></div>
+    <div><label>Số/Ký hiệu</label><input id="aiDocNo" readonly></div>
+    <div><label>Ngày văn bản</label><input id="aiDocDate" type="date" readonly></div>
+    <div class="full"><label>Nội dung trích xuất từ văn bản</label><textarea id="aiDocText" placeholder="Chọn văn bản đã lưu, sau đó bấm “Đọc văn bản đã lưu”. Có thể rà soát, chỉnh lại nội dung trích xuất nếu cần."></textarea></div>
+  </div>
+  <div class="ctrl-actions">
+    <button class="btn primary" onclick="readSelectedDirective()">📖 Đọc văn bản đã lưu</button>
+    <button class="btn light" onclick="analyzeAIDocument()">🤖 Phân tích & đề xuất giao việc</button>
+    <button class="btn light" onclick="clearAIAnalysis()">Làm mới</button>
+    <button class="btn light" onclick="openCtrl('directives')">📣 Mở kho Văn bản chỉ đạo</button>
+  </div>
+  <div id="aiReadStatus" class="ctrl-note">Chưa đọc văn bản.</div>
+
+  <div class="ai-assign-summary">
+    <div><b id="aiTaskCount">0</b><span>Nhiệm vụ phát hiện</span></div>
+    <div><b id="aiNeedReview">0</b><span>Cần lãnh đạo xác nhận</span></div>
+    <div><b id="aiHasDeadline">0</b><span>Có thời hạn</span></div>
+  </div>
+
+  <div style="overflow:auto;max-height:520px">
+    <table class="ctrl-table">
+      <thead><tr>
+        <th>Chọn</th><th>Nhiệm vụ/Văn bản</th><th>Lĩnh vực</th><th>Người thực hiện<br><small>AI đề xuất - lãnh đạo chọn</small></th><th>Phối hợp</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th>Căn cứ trong văn bản</th>
+      </tr></thead>
+      <tbody id="aiAssignRows"></tbody>
+    </table>
+  </div>
+  <div class="ctrl-actions">
+    <span class="ai-leader-note">👤 <b>Lãnh đạo có thể đổi người thực hiện</b> tại từng nhiệm vụ trước khi duyệt.</span>
+    <button class="btn primary" onclick="approveAIAssignments()">✅ Duyệt & giao việc vào Dashboard</button>
+  </div>
+  <div class="ctrl-note"><b>Lưu ý:</b> Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.</div>
+ </div>
+
+<div id="c-work" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng việc</b><strong id="wkTotal">0</strong></div><div class="ctrl-kpi"><b>Chưa thực hiện</b><strong id="wkNew">0</strong></div><div class="ctrl-kpi"><b>Đang thực hiện</b><strong id="wkDoing">0</strong></div><div class="ctrl-kpi"><b>Sắp đến hạn ≤3 ngày</b><strong id="wkSoon">0</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="wkLate">0</strong></div><div class="ctrl-kpi"><b>Hoàn thành</b><strong id="wkDone">0</strong></div></div>
+  <div class="ctrl-note"><b>Luồng quản lý:</b> Lãnh đạo giao <b>văn bản/nhiệm vụ</b> → xác định <b>người thực hiện</b> → ghi rõ <b>kết quả/sản phẩm</b> → đặt <b>thời hạn</b> → cán bộ cập nhật <b>tiến độ/kết quả</b>. Hệ thống tự cảnh báo việc sắp đến hạn và quá hạn.</div>
+  <div class="ctrl-form">
+   <div><label>Người thực hiện</label><select id="wOwner"></select></div><div><label>Lĩnh vực phụ trách</label><input id="wArea" readonly></div><div><label>Loại giao việc</label><select id="wType"><option>Văn bản giao xử lý</option><option>Nhiệm vụ lãnh đạo giao</option><option>Văn bản tham mưu ban hành</option><option>Nhiệm vụ thường xuyên</option></select></div><div><label>Mức độ</label><select id="wPriority"><option>Bình thường</option><option>Quan trọng</option><option>Khẩn</option></select></div>
+   <div class="span2"><label>Văn bản/Nhiệm vụ được giao</label><textarea id="wTask"></textarea></div><div class="span2"><label>Kết quả/Sản phẩm phải hoàn thành</label><textarea id="wProduct"></textarea></div>
+   <div><label>Số/Ký hiệu văn bản đầu vào (nếu có)</label><input id="wInNo"></div><div><label>Văn bản giao việc (PDF/Word/Excel)</label><input id="wFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div><label>Ngày giao</label><input id="wStart" type="date"></div><div><label>Thời hạn hoàn thành</label><input id="wDue" type="date"></div>
+   
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveWork()">＋ Lưu nhiệm vụ/văn bản</button><button class="btn light" onclick="enableWorkNotify()">🔔 Bật nhắc việc hằng ngày</button><button class="btn light" onclick="exportWorkCSV()">⬇ Xuất thống kê CSV</button></div>
+  <div class="tt-result-update"><div class="tt-panel-title"><b>✅ Cập nhật kết quả sau khi thực hiện</b><span>Không nhập tại thời điểm giao việc</span></div><div class="ctrl-form"><div><label>Chọn nhiệm vụ</label><select id="wUpdateTask"></select></div><div><label>Trạng thái</label><select id="wUpdateStatus"><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div><div><label>Tiến độ (%)</label><input id="wUpdateProgress" type="number" min="0" max="100"></div><div><label>Số/Ký hiệu văn bản ban hành</label><input id="wUpdateOutNo"></div><div><label>Ngày ban hành</label><input id="wUpdateOutDate" type="date"></div><div><label>File văn bản/sản phẩm đã thực hiện</label><input id="wUpdateFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><small style="display:block;color:#9f1d16;margin-top:4px">Nhiệm vụ ban hành văn bản: bắt buộc tải file khi cập nhật.</small></div><div class="span2"><label>Kết quả thực tế/Sản phẩm đã hoàn thành</label><textarea id="wUpdateResult"></textarea></div><div><label>Ghi chú</label><textarea id="wUpdateNote"></textarea></div></div><button class="btn primary" onclick="updateWorkResult()">Lưu kết quả thực hiện</button></div><div class="ctrl-filter"><b>Lọc:</b><select id="wfPerson" onchange="renderWork()"><option value="
+b" data-c="aiassign" onclick="switchCtrl('aiassign')">📥🤖 AI giao việc</button>
+  <button class="ctrl-tab" data-c="work" onclick="switchCtrl('work')">📊 Công việc & văn bản</button>
+  <button class="ctrl-tab" data-c="directives" onclick="switchCtrl('directives')">📣 Văn bản chỉ đạo</button><button class="ctrl-tab" data-c="salary" onclick="switchCtrl('salary')">💰 Nâng lương</button>
+ </div>
+
+ <div id="c-meeting" class="ctrl-pane">
+  <div class="ctrl-note"><b>Nguyên tắc:</b> hệ thống chỉ sắp xếp nội dung đã nhập, không tự tạo số liệu, căn cứ, tên người hoặc mốc thời gian. Chỗ thiếu được đánh dấu [CẦN BỔ SUNG].</div>
+  <div class="ctrl-form">
+   <div><label>Ngày họp</label><input id="mhDate" type="date"></div><div><label>Địa điểm</label><input id="mhPlace"></div><div><label>Chủ trì</label><select id="mhChair"></select></div><div><label>Thư ký</label><select id="mhSec"></select></div>
+   <div class="span2"><label>Thành phần dự họp</label><textarea id="mhAttend">Các thành viên trong Ban Xây dựng Đảng</textarea></div><div class="span2"><label>I. NỘI DUNG CUỘC HỌP</label><textarea id="mhAgenda"></textarea></div>
+   <div class="full"><label>1. Đánh giá kết quả thực hiện nhiệm vụ tuần/tháng trước</label><textarea id="mhDiscuss"></textarea></div>
+   <div class="full"><label>2. Triển khai nhiệm vụ tuần/tháng sau và kết luận giao nhiệm vụ</label><textarea id="mhGeneral"></textarea></div>
+   <div><label>Nhiệm vụ giao</label><input id="mhTask"></div><div><label>Người/Bộ phận thực hiện</label><input id="mhOwner"></div><div><label>Kết quả/Sản phẩm phải hoàn thành</label><input id="mhProduct"></div><div><label>Thời hạn</label><input id="mhDue" type="date"></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="addMeetingTask()">＋ Thêm nhiệm vụ vào kết luận</button><button class="btn light" onclick="makeConclusion()">Tạo dự thảo Kết luận</button><button class="btn primary" type="button" onclick="saveMeetingNotice()">💾 Lưu Thông báo kết luận</button><button class="btn light admin-export-only" type="button" onclick="exportCurrentMeetingNoticeWord()">📄 Xuất Word Thông báo</button><button class="btn light" onclick="copyConclusion()">Sao chép</button></div>
+  <div style="overflow:auto"><table class="ctrl-table"><thead><tr><th>STT</th><th>Nhiệm vụ/Văn bản</th><th>Người thực hiện</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th></th></tr></thead><tbody id="meetingTaskRows"></tbody></table></div>
+  <textarea id="mhOutput" class="ctrl-output" readonly></textarea>
+ </div>
+
+ 
+ 
+<div id="meetingNoticePanel" style="margin-top:16px;border-top:1px solid #ead8c7;padding-top:12px">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0;color:#a82619">📚 THÔNG BÁO KẾT LUẬN ĐÃ LƯU</h3><span style="font-size:12px;color:#73584a">Lưu dùng chung để theo dõi, mở lại và xuất Word.</span></div>
+ <div style="overflow:auto;margin-top:8px"><table class="ctrl-table"><thead><tr><th>STT</th><th>Số/Ký hiệu</th><th>Ngày họp</th><th>Nội dung</th><th>Chủ trì</th><th>Số nhiệm vụ</th><th>Thao tác</th></tr></thead><tbody id="meetingNoticeRows"></tbody></table></div>
+</div>
+<div id="c-aiassign" class="ctrl-pane">
+  <div class="ctrl-note"><b>Quy trình thử nghiệm:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc tệp đã lưu → phân tích theo từ khóa nghiệp vụ và lĩnh vực đã phân công → đề xuất người chủ trì/phối hợp, sản phẩm và thời hạn nếu văn bản có nêu. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b></div>
+  <div class="ctrl-form">
+    <div class="span2"><label>Chọn văn bản đã lưu tại mục Văn bản chỉ đạo</label><select id="aiDirectiveSelect" onchange="syncSelectedDirectiveInfo()"></select></div>
+    <div><label>Số/Ký hiệu</label><input id="aiDocNo" readonly></div>
+    <div><label>Ngày văn bản</label><input id="aiDocDate" type="date" readonly></div>
+    <div class="full"><label>Nội dung trích xuất từ văn bản</label><textarea id="aiDocText" placeholder="Chọn văn bản đã lưu, sau đó bấm “Đọc văn bản đã lưu”. Có thể rà soát, chỉnh lại nội dung trích xuất nếu cần."></textarea></div>
+  </div>
+  <div class="ctrl-actions">
+    <button class="btn primary" onclick="readSelectedDirective()">📖 Đọc văn bản đã lưu</button>
+    <button class="btn light" onclick="analyzeAIDocument()">🤖 Phân tích & đề xuất giao việc</button>
+    <button class="btn light" onclick="clearAIAnalysis()">Làm mới</button>
+    <button class="btn light" onclick="openCtrl('directives')">📣 Mở kho Văn bản chỉ đạo</button>
+  </div>
+  <div id="aiReadStatus" class="ctrl-note">Chưa đọc văn bản.</div>
+
+  <div class="ai-assign-summary">
+    <div><b id="aiTaskCount">0</b><span>Nhiệm vụ phát hiện</span></div>
+    <div><b id="aiNeedReview">0</b><span>Cần lãnh đạo xác nhận</span></div>
+    <div><b id="aiHasDeadline">0</b><span>Có thời hạn</span></div>
+  </div>
+
+  <div style="overflow:auto;max-height:520px">
+    <table class="ctrl-table">
+      <thead><tr>
+        <th>Chọn</th><th>Nhiệm vụ/Văn bản</th><th>Lĩnh vực</th><th>Người thực hiện<br><small>AI đề xuất - lãnh đạo chọn</small></th><th>Phối hợp</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th>Căn cứ trong văn bản</th>
+      </tr></thead>
+      <tbody id="aiAssignRows"></tbody>
+    </table>
+  </div>
+  <div class="ctrl-actions">
+    <span class="ai-leader-note">👤 <b>Lãnh đạo có thể đổi người thực hiện</b> tại từng nhiệm vụ trước khi duyệt.</span>
+    <button class="btn primary" onclick="approveAIAssignments()">✅ Duyệt & giao việc vào Dashboard</button>
+  </div>
+  <div class="ctrl-note"><b>Lưu ý:</b> Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.</div>
+ </div>
+
+<div id="c-work" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng việc</b><strong id="wkTotal">0</strong></div><div class="ctrl-kpi"><b>Chưa thực hiện</b><strong id="wkNew">0</strong></div><div class="ctrl-kpi"><b>Đang thực hiện</b><strong id="wkDoing">0</strong></div><div class="ctrl-kpi"><b>Sắp đến hạn ≤3 ngày</b><strong id="wkSoon">0</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="wkLate">0</strong></div><div class="ctrl-kpi"><b>Hoàn thành</b><strong id="wkDone">0</strong></div></div>
+  <div class="ctrl-note"><b>Luồng quản lý:</b> Lãnh đạo giao <b>văn bản/nhiệm vụ</b> → xác định <b>người thực hiện</b> → ghi rõ <b>kết quả/sản phẩm</b> → đặt <b>thời hạn</b> → cán bộ cập nhật <b>tiến độ/kết quả</b>. Hệ thống tự cảnh báo việc sắp đến hạn và quá hạn.</div>
+  <div class="ctrl-form">
+   <div><label>Người thực hiện</label><select id="wOwner"></select></div><div><label>Lĩnh vực phụ trách</label><input id="wArea" readonly></div><div><label>Loại giao việc</label><select id="wType"><option>Văn bản giao xử lý</option><option>Nhiệm vụ lãnh đạo giao</option><option>Văn bản tham mưu ban hành</option><option>Nhiệm vụ thường xuyên</option></select></div><div><label>Mức độ</label><select id="wPriority"><option>Bình thường</option><option>Quan trọng</option><option>Khẩn</option></select></div>
+   <div class="span2"><label>Văn bản/Nhiệm vụ được giao</label><textarea id="wTask"></textarea></div><div class="span2"><label>Kết quả/Sản phẩm phải hoàn thành</label><textarea id="wProduct"></textarea></div>
+   <div><label>Số/Ký hiệu văn bản đầu vào (nếu có)</label><input id="wInNo"></div><div><label>Văn bản giao việc (PDF/Word/Excel)</label><input id="wFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div><label>Ngày giao</label><input id="wStart" type="date"></div><div><label>Thời hạn hoàn thành</label><input id="wDue" type="date"></div>
+   
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveWork()">＋ Lưu nhiệm vụ/văn bản</button><button class="btn light" onclick="enableWorkNotify()">🔔 Bật nhắc việc hằng ngày</button><button class="btn light" onclick="exportWorkCSV()">⬇ Xuất thống kê CSV</button></div>
+  <div class="tt-result-update"><div class="tt-panel-title"><b>✅ Cập nhật kết quả sau khi thực hiện</b><span>Không nhập tại thời điểm giao việc</span></div><div class="ctrl-form"><div><label>Chọn nhiệm vụ</label><select id="wUpdateTask"></select></div><div><label>Trạng thái</label><select id="wUpdateStatus"><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div><div><label>Tiến độ (%)</label><input id="wUpdateProgress" type="number" min="0" max="100"></div><div><label>Số/Ký hiệu văn bản ban hành</label><input id="wUpdateOutNo"></div><div><label>Ngày ban hành</label><input id="wUpdateOutDate" type="date"></div><div><label>File văn bản/sản phẩm đã thực hiện</label><input id="wUpdateFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><small style="display:block;color:#9f1d16;margin-top:4px">Nhiệm vụ ban hành văn bản: bắt buộc tải file khi cập nhật.</small></div><div class="span2"><label>Kết quả thực tế/Sản phẩm đã hoàn thành</label><textarea id="wUpdateResult"></textarea></div><div><label>Ghi chú</label><textarea id="wUpdateNote"></textarea></div></div><button class="btn primary" onclick="updateWorkResult()">Lưu kết quả thực hiện</button></div><div class="ctrl-filter"><b>Lọc:</b><select id="wfPerson" onchange="renderWork()"><option value="">Tất cả thành viên</option></select><select id="wfPeriod" onchange="renderWork()"><option value="all">Tất cả thời gian</option><option value="week">Tuần này</option><option value="month">Tháng này</option></select><select id="wfStatus" onchange="renderWork()"><option value="">Tất cả trạng thái</option><option>Chưa thực hiện</option><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div>
+  <div id="workAlert" class="ctrl-note"></div>
+  <div style="overflow:auto;max-height:430px"><table class="ctrl-table"><thead><tr><th>Người thực hiện</th><th>Lĩnh vực</th><th>Văn bản/Nhiệm vụ</th><th>Kết quả/Sản phẩm</th><th>Hạn</th><th>Tiến độ</th><th>Cảnh báo</th><th>Văn bản ban hành</th><th>File đã thực hiện</th><th></th></tr></thead><tbody id="workRows"></tbody></table></div>
+  <h3 style="color:#9f1d16">Thống kê văn bản ban hành theo công chức</h3><div id="workStats" class="ctrl-note"></div>
+ </div>
+
+ <div id="c-report" class="ctrl-pane">
+  <div class="ctrl-note">Mẫu nhập được xây dựng theo chính bố cục báo cáo bạn gửi. Cùng một cấu trúc áp dụng cho <b>tuần, tháng, quý, năm</b>; mỗi đồng chí chọn đúng mục/lĩnh vực để nhập, sau đó người tổng hợp tạo bản báo cáo chung.</div>
+  <div class="ctrl-form">
+   <div><label>Loại báo cáo</label><select id="rpType"><option>Tuần</option><option>Tháng</option><option>Quý</option><option>Năm</option></select></div><div><label>Kỳ báo cáo</label><input id="rpPeriod" placeholder="VD: Tuần 35/2026"></div><div><label>Người nhập</label><select id="rpPerson"></select></div><div><label>Lĩnh vực</label><input id="rpArea" readonly></div>
+   <div class="full"><label>Mục trong mẫu báo cáo</label><select id="rpSection"></select></div>
+   <div class="full"><label>Nội dung/Kết quả</label><textarea id="rpContent"></textarea></div><div class="span2"><label>Khó khăn, vướng mắc (nếu có)</label><textarea id="rpIssue"></textarea></div><div class="span2"><label>Nhiệm vụ kỳ tiếp theo/đề xuất (nếu có)</label><textarea id="rpNext"></textarea></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveReportItem()">Lưu nội dung lĩnh vực</button><button class="btn light" onclick="buildFullReport()">Tổng hợp theo mẫu</button><button class="btn light" onclick="downloadReport()">⬇ Tải bản tổng hợp</button></div>
+  <textarea id="rpOutput" class="ctrl-output" readonly placeholder="Bản tổng hợp sẽ hiển thị ở đây..."></textarea>
+  <div style="overflow:auto;max-height:330px;margin-top:10px"><table class="ctrl-table"><thead><tr><th>Kỳ</th><th>Người nhập</th><th>Lĩnh vực</th><th>Mục báo cáo</th><th>Nội dung</th><th></th></tr></thead><tbody id="reportRows"></tbody></table></div>
+ </div>
+
+ <div id="c-directives" class
+ĐÃ LƯU</h3><span style="font-size:12px;color:#73584a">Lưu dùng chung để theo dõi, mở lại và xuất Word.</span></div>
+ <div style="overflow:auto;margin-top:8px"><table class="ctrl-table"><thead><tr><th>STT</th><th>Số/Ký hiệu</th><th>Ngày họp</th><th>Nội dung</th><th>Chủ trì</th><th>Số nhiệm vụ</th><th>Thao tác</th></tr></thead><tbody id="meetingNoticeRows"></tbody></table></div>
+</div>
+<div id="c-aiassign" class="ctrl-pane">
+  <div class="ctrl-note"><b>Quy trình thử nghiệm:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc tệp đã lưu → phân tích theo từ khóa nghiệp vụ và lĩnh vực đã phân công → đề xuất người chủ trì/phối hợp, sản phẩm và thời hạn nếu văn bản có nêu. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b></div>
+  <div class="ctrl-form">
+    <div class="span2"><label>Chọn văn bản đã lưu tại mục Văn bản chỉ đạo</label><select id="aiDirectiveSelect" onchange="syncSelectedDirectiveInfo()"></select></div>
+    <div><label>Số/Ký hiệu</label><input id="aiDocNo" readonly></div>
+    <div><label>Ngày văn bản</label><input id="aiDocDate" type="date" readonly></div>
+    <div class="full"><label>Nội dung trích xuất từ văn bản</label><textarea id="aiDocText" placeholder="Chọn văn bản đã lưu, sau đó bấm “Đọc văn bản đã lưu”. Có thể rà soát, chỉnh lại nội dung trích xuất nếu cần."></textarea></div>
+  </div>
+  <div class="ctrl-actions">
+    <button class="btn primary" onclick="readSelectedDirective()">📖 Đọc văn bản đã lưu</button>
+    <button class="btn light" onclick="analyzeAIDocument()">🤖 Phân tích & đề xuất giao việc</button>
+    <button class="btn light" onclick="clearAIAnalysis()">Làm mới</button>
+    <button class="btn light" onclick="openCtrl('directives')">📣 Mở kho Văn bản chỉ đạo</button>
+  </div>
+  <div id="aiReadStatus" class="ctrl-note">Chưa đọc văn bản.</div>
+
+  <div class="ai-assign-summary">
+    <div><b id="aiTaskCount">0</b><span>Nhiệm vụ phát hiện</span></div>
+    <div><b id="aiNeedReview">0</b><span>Cần lãnh đạo xác nhận</span></div>
+    <div><b id="aiHasDeadline">0</b><span>Có thời hạn</span></div>
+  </div>
+
+  <div style="overflow:auto;max-height:520px">
+    <table class="ctrl-table">
+      <thead><tr>
+        <th>Chọn</th><th>Nhiệm vụ/Văn bản</th><th>Lĩnh vực</th><th>Người thực hiện<br><small>AI đề xuất - lãnh đạo chọn</small></th><th>Phối hợp</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th>Căn cứ trong văn bản</th>
+      </tr></thead>
+      <tbody id="aiAssignRows"></tbody>
+    </table>
+  </div>
+  <div class="ctrl-actions">
+    <span class="ai-leader-note">👤 <b>Lãnh đạo có thể đổi người thực hiện</b> tại từng nhiệm vụ trước khi duyệt.</span>
+    <button class="btn primary" onclick="approveAIAssignments()">✅ Duyệt & giao việc vào Dashboard</button>
+  </div>
+  <div class="ctrl-note"><b>Lưu ý:</b> Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.</div>
+ </div>
+
+<div id="c-work" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng việc</b><strong id="wkTotal">0</strong></div><div class="ctrl-kpi"><b>Chưa thực hiện</b><strong id="wkNew">0</strong></div><div class="ctrl-kpi"><b>Đang thực hiện</b><strong id="wkDoing">0</strong></div><div class="ctrl-kpi"><b>Sắp đến hạn ≤3 ngày</b><strong id="wkSoon">0</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="wkLate">0</strong></div><div class="ctrl-kpi"><b>Hoàn thành</b><strong id="wkDone">0</strong></div></div>
+  <div class="ctrl-note"><b>Luồng quản lý:</b> Lãnh đạo giao <b>văn bản/nhiệm vụ</b> → xác định <b>người thực hiện</b> → ghi rõ <b>kết quả/sản phẩm</b> → đặt <b>thời hạn</b> → cán bộ cập nhật <b>tiến độ/kết quả</b>. Hệ thống tự cảnh báo việc sắp đến hạn và quá hạn.</div>
+  <div class="ctrl-form">
+   <div><label>Người thực hiện</label><select id="wOwner"></select></div><div><label>Lĩnh vực phụ trách</label><input id="wArea" readonly></div><div><label>Loại giao việc</label><select id="wType"><option>Văn bản giao xử lý</option><option>Nhiệm vụ lãnh đạo giao</option><option>Văn bản tham mưu ban hành</option><option>Nhiệm vụ thường xuyên</option></select></div><div><label>Mức độ</label><select id="wPriority"><option>Bình thường</option><option>Quan trọng</option><option>Khẩn</option></select></div>
+   <div class="span2"><label>Văn bản/Nhiệm vụ được giao</label><textarea id="wTask"></textarea></div><div class="span2"><label>Kết quả/Sản phẩm phải hoàn thành</label><textarea id="wProduct"></textarea></div>
+   <div><label>Số/Ký hiệu văn bản đầu vào (nếu có)</label><input id="wInNo"></div><div><label>Văn bản giao việc (PDF/Word/Excel)</label><input id="wFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div><label>Ngày giao</label><input id="wStart" type="date"></div><div><label>Thời hạn hoàn thành</label><input id="wDue" type="date"></div>
+   
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveWork()">＋ Lưu nhiệm vụ/văn bản</button><button class="btn light" onclick="enableWorkNotify()">🔔 Bật nhắc việc hằng ngày</button><button class="btn light" onclick="exportWorkCSV()">⬇ Xuất thống kê CSV</button></div>
+  <div class="tt-result-update"><div class="tt-panel-title"><b>✅ Cập nhật kết quả sau khi thực hiện</b><span>Không nhập tại thời điểm giao việc</span></div><div class="ctrl-form"><div><label>Chọn nhiệm vụ</label><select id="wUpdateTask"></select></div><div><label>Trạng thái</label><select id="wUpdateStatus"><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div><div><label>Tiến độ (%)</label><input id="wUpdateProgress" type="number" min="0" max="100"></div><div><label>Số/Ký hiệu văn bản ban hành</label><input id="wUpdateOutNo"></div><div><label>Ngày ban hành</label><input id="wUpdateOutDate" type="date"></div><div><label>File văn bản/sản phẩm đã thực hiện</label><input id="wUpdateFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><small style="display:block;color:#9f1d16;margin-top:4px">Nhiệm vụ ban hành văn bản: bắt buộc tải file khi cập nhật.</small></div><div class="span2"><label>Kết quả thực tế/Sản phẩm đã hoàn thành</label><textarea id="wUpdateResult"></textarea></div><div><label>Ghi chú</label><textarea id="wUpdateNote"></textarea></div></div><button class="btn primary" onclick="updateWorkResult()">Lưu kết quả thực hiện</button></div><div class="ctrl-filter"><b>Lọc:</b><select id="wfPerson" onchange="renderWork()"><option value="">Tất cả thành viên</option></select><select id="wfPeriod" onchange="renderWork()"><option value="all">Tất cả thời gian</option><option value="week">Tuần này</option><option value="month">Tháng này</option></select><select id="wfStatus" onchange="renderWork()"><option value="">Tất cả trạng thái</option><option>Chưa thực hiện</option><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div>
+  <div id="workAlert" class="ctrl-note"></div>
+  <div style="overflow:auto;max-height:430px"><table class="ctrl-table"><thead><tr><th>Người thực hiện</th><th>Lĩnh vực</th><th>Văn bản/Nhiệm vụ</th><th>Kết quả/Sản phẩm</th><th>Hạn</th><th>Tiến độ</th><th>Cảnh báo</th><th>Văn bản ban hành</th><th>File đã thực hiện</th><th></th></tr></thead><tbody id="workRows"></tbody></table></div>
+  <h3 style="color:#9f1d16">Thống kê văn bản ban hành theo công chức</h3><div id="workStats" class="ctrl-note"></div>
+ </div>
+
+ <div id="c-report" class="ctrl-pane">
+  <div class="ctrl-note">Mẫu nhập được xây dựng theo chính bố cục báo cáo bạn gửi. Cùng một cấu trúc áp dụng cho <b>tuần, tháng, quý, năm</b>; mỗi đồng chí chọn đúng mục/lĩnh vực để nhập, sau đó người tổng hợp tạo bản báo cáo chung.</div>
+  <div class="ctrl-form">
+   <div><label>Loại báo cáo</label><select id="rpType"><option>Tuần</option><option>Tháng</option><option>Quý</option><option>Năm</option></select></div><div><label>Kỳ báo cáo</label><input id="rpPeriod" placeholder="VD: Tuần 35/2026"></div><div><label>Người nhập</label><select id="rpPerson"></select></div><div><label>Lĩnh vực</label><input id="rpArea" readonly></div>
+   <div class="full"><label>Mục trong mẫu báo cáo</label><select id="rpSection"></select></div>
+   <div class="full"><label>Nội dung/Kết quả</label><textarea id="rpContent"></textarea></div><div class="span2"><label>Khó khăn, vướng mắc (nếu có)</label><textarea id="rpIssue"></textarea></div><div class="span2"><label>Nhiệm vụ kỳ tiếp theo/đề xuất (nếu có)</label><textarea id="rpNext"></textarea></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveReportItem()">Lưu nội dung lĩnh vực</button><button class="btn light" onclick="buildFullReport()">Tổng hợp theo mẫu</button><button class="btn light" onclick="downloadReport()">⬇ Tải bản tổng hợp</button></div>
+  <textarea id="rpOutput" class="ctrl-output" readonly placeholder="Bản tổng hợp sẽ hiển thị ở đây..."></textarea>
+  <div style="overflow:auto;max-height:330px;margin-top:10px"><table class="ctrl-table"><thead><tr><th>Kỳ</th><th>Người nhập</th><th>Lĩnh vực</th><th>Mục báo cáo</th><th>Nội dung</th><th></th></tr></thead><tbody id="reportRows"></tbody></table></div>
+ </div>
+
+ <div id="c-directives" class="ctrl-pane"><div class="ctrl-note">Theo dõi văn bản chỉ đạo theo <b>lĩnh vực phụ trách</b>, đồng thời lọc theo tuần, tháng, năm.</div><div class="ctrl-form"><div><label>Số/Ký hiệu</label><input id="vdNo"></div><div><label>Ngày ban hành</label><input id="vdDate" type="date"></div><div><label>Cơ quan/đơn vị ban hành</label><input id="vdIssuer"></div><div><label>Lĩnh vực phụ trách</label><select id="vdArea"></select></div><div><label>Tệp văn bản</label><input id="vdFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div class="full"><label>Trích yếu/Nội dung chỉ đạo</label><textarea id="vdTitle"></textarea></div><div class="span2"><label>Ghi chú/Nhiệm vụ cần theo dõi</label><textarea id="vdNote"></textarea></div></div><div class="ctrl-actions"><button class="btn primary" onclick="saveDirective()">＋ Lưu văn bản</button></div><div class="ctrl-filter"><b>Thống kê:</b><select id="vdPeriod" onchange="renderDirectives()"><option value="all" selected>Tất cả</option><option value="week">Tuần này</option><option value="month">Tháng này</option><option value="year">Năm nay</option></select><select id="vdAreaFilter" onchange="renderDirectives()"><option value="">Tất cả lĩnh vực</option></select><input id="vdSearch" placeholder="Tìm số, trích yếu..." oninput="renderDirectives()"></div><div id="vdStats" class="ctrl-note"></div>
+<div class="vd-ai-report">
+ <div class="vd-ai-report-head">
+  <div><b>📥 VĂN BẢN CHỈ ĐẠO – THEO LĨNH VỰC</b><span>Mỗi văn bản chỉ hiển thị một lần; tại đây có thể xem, tải và phân tích để giao việc.</span></div>
+  <div class="vd-ai-report-actions"><button class="btn light" onclick="buildDirectiveSummary()">↻ Cập nhật danh sách</button><button class="btn light" onclick="copyDirectiveSummary()">📋 Sao chép báo cáo</button><button class="btn primary" onclick="sendSummaryToAIReview()">🤖 Phân tích nhiệm vụ</button></div>
+ </div>
+ <div id="vdSummaryStatus" class="ctrl-note">Danh sách văn bản được tổng hợp tự động theo lĩnh vực.</div>
+ <div id="vdSummaryBox"></div>
+</div>
+<div id="vdGrouped" style="display:none!important"></div></div><div id="c-salary" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng CBCC</b><strong id="slTotal">36</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="slLate">0</strong></div><div class="ctrl-kpi"><b>≤30 ngày</b><strong id="sl30">0</strong></div><div class="ctrl-kpi"><b>31–90 ngày</b><strong id="sl90">0</strong></div><div class="ctrl-kpi"><b>Đã có QĐ/Ghi chú nâng</b><strong id="slRaised">0</strong></div><div class="ctrl-kpi"><b>Thiếu dữ liệu</b><strong id="slMissing">0</strong></div></div>
+  <div class="ctrl-note">Dữ liệu ban đầu được nạp từ <b>Biểu theo dõi nâng lương</b> bạn gửi: họ tên, chức vụ, ngạch, bậc/hệ số, ngày hưởng gần nhất, chu kỳ, số qu
+ Map();
+ (local||[]).forEach(x=>m.set(String(x?.[key]??x?.name??JSON.stringify(x)),x));
+ (remote||[]).forEach(x=>{const k=String(x?.[key]??x?.name??JSON.stringify(x));const l=m.get(k);m.set(k,l?{...l,...x}:x)});
+ return [...m.values()]
+}
+function mergeCTRL(remote,local){
+ const r=(remote&&typeof remote==='object')?remote:{},l=(local&&typeof local==='object')?local:{};
+ const o={...r,...l};
+ ['work','reports','meetingTasks','directives','meetingNotices'].forEach(k=>o[k]=ctrlMergeArray(r[k],l[k],'id'));
+ o.salary=ctrlMergeArray(r.salary,l.salary,'name');
+ if(!o.salary||o.salary.length<30)o.salary=SALARY_SOURCE;
+ return o
+}
+async function syncSharedCTRL(){
+ if(CTRL_SYNC_BUSY||typeof sb==='undefined')return; CTRL_SYNC_BUSY=true;
+ try{
+  const sess=(await sb.auth.getSession()).data?.session;if(!sess)return;
+  const {data}=await sb.from('app_shared_state').select('state,updated_at').eq('state_key','control').maybeSingle();
+  const merged=mergeCTRL(data?.state||{},CTRL);
+  try{if(data?.state&&Object.keys(data.state).length)await backupRemoteCTRL(data.state)}catch(e){}
+  const payload={state_key:'control',state:merged,updated_at:new Date().toISOString(),updated_by:sess.user.id};
+  const {error}=await sb.from('app_shared_state').upsert(payload,{onConflict:'state_key'});if(error)throw error;
+  CTRL=merged;localStorage.setItem(CTRLKEY,JSON.stringify(CTRL));CTRL_REMOTE_UPDATED=payload.updated_at;CTRL_SYNC_READY=true;
+ }catch(e){console.warn('Shared CTRL save failed:',e)}finally{CTRL_SYNC_BUSY=false}
+}
+async function loadSharedCTRL(){
+ if(typeof sb==='undefined')return;
+ try{
+  const sess=(await sb.auth.getSession()).data?.session;if(!sess)return;
+  const {data,error}=await sb.from('app_shared_state').select('state,updated_at').eq('state_key','control').maybeSingle();if(error)throw error;
+  if(data?.state&&Object.keys(data.state).length){backupLocalCTRL();CTRL=mergeCTRL(data.state,CTRL);localStorage.setItem(CTRLKEY,JSON.stringify(CTRL));CTRL_REMOTE_UPDATED=data.updated_at||'';CTRL_SYNC_READY=true;renderCtrlAll();if(typeof renderTTOverview==='function')renderTTOverview();if(typeof renderTTStaff==='function')renderTTStaff();if(typeof renderStaffWorkCards==='function')renderStaffWorkCards();if(typeof renderDocumentLookup==='function')renderDocumentLookup();if(typeof renderDirectives==='function')renderDirectives()}
+  else if(isThuLamAdmin?.()) await syncSharedCTRL();
+ }catch(e){console.warn('Shared CTRL load failed:',e)}
+}
+window.addEventListener('load',()=>setTimeout(loadSharedCTRL,1200));
+window.addEventListener('focus',()=>{if(CTRL_SYNC_READY)setTimeout(loadSharedCTRL,200)});
+
+
+async function recoverLegacyDirectives(){
+ try{
+  if(typeof sb==='undefined')return;
+  ensureDirectives?.();
+  const {data,error}=await sb.from('xa_directives').select('*').order('id',{ascending:true});if(error||!data?.length)return;
+  const existing=new Set((CTRL.directives||[]).map(x=>String(x.no||x.document_no||'').trim()+'|'+String(x.title||'').trim()));
+  let changed=false;
+  for(const d of data){
+   const k=String(d.document_no||'').trim()+'|'+String(d.title||'').trim();if(existing.has(k))continue;
+   CTRL.directives.push({id:'legacy-'+d.id,no:d.document_no||'',date:d.issued_date||'',title:d.title||'',area:d.category||'Văn bản chỉ đạo',summary:d.summary||'',fileUrl:d.file_url||'',source:'xa_directives'});existing.add(k);changed=true;
+  }
+  if(changed){localStorage.setItem(CTRLKEY,JSON.stringify(CTRL));renderDirectives?.();renderDocumentLookup?.()}
+ }catch(e){console.warn('Legacy directive recovery skipped',e)}
+}
+
+function openCtrl(p){ctrlModal.style.display='block';switchCtrl(p)} function closeCtrl(){ctrlModal.style.display='none'}
+function switchCtrl(p){document.querySelectorAll('.ctrl-pane').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.ctrl-tab').forEach(x=>x.classList.toggle('active',x.dataset.c===p));document.getElementById('c-'+p)?.classList.add('active');renderCtrlAll()}
+function initCtrlSelects(){
+ const opts='<option value="">-- Chọn --</option>'+STAFF.map((x,i)=>`<option value="${i}">${ce(x.name)}</option>`).join('');
+ wOwner.innerHTML=opts;rpPerson.innerHTML=opts;wfPerson.innerHTML='<option value="">Tất cả thành viên</option>'+STAFF.map(x=>`<option>${ce(x.name)}</option>`).join('');
+ rpSection.innerHTML=REPORT_SECTIONS.map(x=>`<option>${ce(x)}</option>`).join('');
+ wOwner.onchange=()=>{let x=STAFF[+wOwner.value];wArea.value=x?.area||''};rpPerson.onchange=()=>{let x=STAFF[+rpPerson.value];rpArea.value=x?.area||''};
+}
+function dleft(d){if(!d)return null;let a=new Date();a.setHours(0,0,0,0);let b=new Date(d+'T00:00:00');return Math.ceil((b-a)/86400000)}
+function remain(d,status){if(status==='Đã hoàn thành')return '<span class="st-ok">Đã hoàn thành</span>';let n=dleft(d);if(n===null)return '';if(n<0)return `<span class="st-late">Quá ${Math.abs(n)} ngày</span>`;if(n<=3)return `<span class="st-warn">Còn ${n} ngày</span>`;return `Còn ${n} ngày`}
+function addMeetingTask(){if(!mhTask.value.trim())return alert('Nhập nhiệm vụ/văn bản giao.');CTRL.meetingTasks.push({id:Date.now(),task:mhTask.value.trim(),owner:mhOwner.value.trim(),product:mhProduct.value.trim(),due:mhDue.value});csave();mhTask.value='';mhOwner.value='';mhProduct.value='';mhDue.value=''}
+function delMeetingTask(id){CTRL.meetingTasks=CTRL.meetingTasks.filter(x=>x.id!==id);csave()}
+function renderMeetingTasks(){meetingTaskRows.innerHTML=CTRL.meetingTasks.map((x,i)=>`<tr><td>${i+1}</td><td>${ce(x.task)}</td><td>${ce(x.owner)}</td><td>${ce(x.product)}</td><td>${ce(x.due)}</td><td><button class="wh-smallbtn" onclick="delMeetingTask(${x.id})">Xóa</button></td></tr>`).join('')}
+function makeConclusion(){
+ const dt=mhDate.value?new Date(mhDate.value+'T00:00:00').toLocaleDateString('vi-VN'):'[CẦN BỔ SUNG]';
+ let tasks=CTRL.meetingTasks.length?CTRL.meetingTasks.map((x,i)=>`${i+1}. ${x.task}\n- Người/Bộ phận thực hiện: ${x.owner||'[CẦN BỔ SUNG]'}\n- Kết quả/Sản phẩm: ${x.product||'[CẦN BỔ SUNG]'}\n- Thời hạn hoàn thành: ${x.due?new Date(x.due+'T00:00:00').toLocaleDateString('vi-VN'):'[CẦN BỔ SUNG]'}`).join('\n\n'):'[CẦN BỔ SUNG]';
+ mhOutput.value=`BAN XÂY DỰNG ĐẢNG XÃ THƯ LÂM\n\nDỰ THẢO KẾT LUẬN HỌP BAN XÂY DỰNG ĐẢNG\n\nHôm nay, ngày ${dt}, tại ${mhPlace.value||'[CẦN BỔ SUNG]'}, Ban Xây dựng Đảng tổ chức họp.\n\nI. THÀNH PHẦN\n1. Chủ trì: ${mhChair.value||'[CẦN BỔ SUNG]'}\n2. Thư ký: ${mhSec.value||'[CẦN BỔ SUNG]'}\n3. Thành phần dự họp: ${mhAttend.value||'[CẦN BỔ SUNG]'}\n\nII. NỘI DUNG HỌP\n${mhAgenda.value||'[CẦN BỔ SUNG]'}\n\nIII. Ý KIẾN THẢO LUẬN VÀ NỘI DUNG THỐNG NHẤT\n${mhDiscuss.value||'[CẦN BỔ SUNG]'}\n\nIV. KẾT LUẬN CỦA ĐỒNG CHÍ CHỦ TRÌ\n${mhGeneral.value||'[CẦN BỔ SUNG]'}\n\nV. NHIỆM VỤ, SẢN PHẨM VÀ THỜI HẠN THỰC HIỆN\n${tasks}\n\nVI. TỔ CHỨC THỰC HIỆN\nCác đồng chí được giao nhiệm vụ chủ động tổ chức thực hiện, bảo đảm chất lượng và thời hạn; kịp thời báo cáo lãnh đạo Ban những khó khăn, vướng mắc phát sinh trong quá trình thực hiện. Kết quả thực hiện được cập nhật vào hệ thống theo dõi công việc để phục vụ công tác đôn đốc, tổng hợp.\n\n[Cán bộ kiểm tra, hoàn thiện trước khi sử dụng chính thức.]`;}
+function copyConclusion(){navigator.clipboard.writeText(mhOutput.value||'')}
+function saveWork(){
+ if(wOwner.value===''||!wTask.value.trim())return alert('Chọn người thực hiện và nhập nhiệm vụ/văn bản.');
+ let st=STAFF[+wOwner.value];CTRL.work.push({id:Date.now(),owner:st.name,area:wArea.value,type:wType.value,priority:wPriority.value,task:wTask.value.trim(),product:wProduct.value.trim(),inNo:wInNo.value.trim(),start:wStart.value,due:wDue.value,status:wStatus.value,progress:+wProgress.value||0,outNo:wOutNo.value.trim(),outDate:wOutDate.value,result:wResult.value.trim()});csave();wTask.value='';wProduct.value='';wInNo.value='';
+}
+function delWork2(id){CTRL.work=CTRL.work.filter(x=>x.id!==id);csave()}
+function inPeriod(x,mode){if(mode==='all')return true;let d=new Date((x.outDate||x.start||x.due||'1970-01-01')+'T00:00:00'),n=new Date();if(mode==='month')return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();let day=(n.getDay()+6)%7,st=new Date(n);st.setDate(n.getDate()-day);st.setHours(0,0,0,0);let en=new Date(st);en.setDate(st.getDate()+7);return d>=st&&d<en}
+function renderWork(){
+ let arr=CTRL.work.filter(x=>(!wfPerson.value||x.owner===wfPerson.value)&&(!wfStatus.value||x.status===wfStatus.value)&&inPeriod(x,wfPeriod.value));
+ workRows.innerHTML=arr.map(x=>`<tr><td><b>${ce(x.owner)}</b></td><td>${ce(x.area)}</td><td><small>${ce(x.type)}</small><br>${ce(x.task)}${x.inNo?'<br><b>VB vào:</b> '+ce(x.inNo):''}</td><td>${ce(x.product)}</td><td>${ce(x.due)}</td><td>${x.progress}%<br>${ce(x.status)}</td><td>${remain(x.due,x.status)}</td><td>${x.outNo?ce(x.outNo)+'<br>'+ce(x.outDate):''}</td><td>${x.outputFile?`<button class="wh-smallbtn" onclick="viewWorkOutputFile('${x.id}')">👁 Xem</button><br><small>${ce(x.outputFile)}</small>`:'—'}</td><td><button class="wh-smallbtn" onclick="delWork2(${x.id})">Xóa</button></td></tr>`).join('');
+ let all=CTRL.work,total=all.length,newc=all.filter(x=>x.status==='Chưa thực hiện').length,doing=all.filter(x=>['Đang thực hiện','Chờ phối hợp'].includes(x.status)).length,soon=all.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)>=0&&dleft(x.due)<=3).length,late=all.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)<0).length,done=all.filter(x=>x.status==='Đã hoàn thành').length;
+ wkTotal.textContent=total;wkNew.textContent=newc;wkDoing.textContent=doing;wkSoon.textContent=soon;wkLate.textContent=late;wkDone.textContent=done;workAlert.innerHTML=late?`⚠ Có <b>${late}</b> nhiệm vụ quá hạn; <b>${soon}</b> nhiệm vụ sắp đến hạn.`:`Không có nhiệm vụ quá hạn. Có ${soon} nhiệm vụ sắp đến hạn.`;
+ let docs=arr.filter(x=>x.outNo||x.type==='Văn bản tham mưu ban hành'),by={};docs.forEach(x=>by[x.owner]=(by[x.owner]||0)+1);workStats.textContent=Object.keys(by).length?Object.entries(by).map(([k,v])=>`${k}: ${v} văn bản`).join(' | '):'Chưa có văn bản ban hành trong phạm vi lọc.'
+}
+async function enableWorkNotify(){if(!('Notification'in window))return alert('Trình duyệt không hỗ trợ thông báo.');let p=await Notification.requestPermission();if(p==='granted')new Notification('Trung tâm AI - Ban Xây dựng Đảng',{body:'Đã bật nhắc việc. Khi mở Trung tâm mỗi ngày, hệ thống sẽ cảnh báo nhiệm vụ đến hạn/quá hạn.'})}
+function dailyWorkNotify(){if(!('Notification'in window)||Notification.permission!=='granted')return;let key='tl_work_notify_'+new Date().toISOString().slice(0,10);if(localStorage.getItem(key))return;let a=CTRL.work.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)<=1);if(a.length){new Notification('Nhắc việc Ban Xây dựng Đảng',{body:`Có ${a.length} nhiệm vụ đến hạn hoặc quá hạn cần kiểm tra.`});localStorage.setItem(key,'1')}}
+function exportWorkCSV(){let h=['Người thực hiện','Lĩnh vực','Loại','Văn bản/Nhiệm vụ','Kết quả/Sản phẩm','Ngày giao','Thời hạn','Trạng thái','Tiến độ','Số VB ban hành','Ngày ban hành','Kết quả thực tế'];let rows=CTRL.work.map(x=>[x.owner,x.area,x.type,x.task,x.product,x.start,x.due,x.status,x.progress,x.outNo,x.outDate,x.result]);let csv='\ufeff'+[h,...rows].map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\n');let b=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='Thong_ke_cong_viec_van_ban.csv';a.click()}
+function saveReportItem(){if(!rpPeriod.value.trim()||rpPerson.value===''||!rpContent.value.trim())return alert('Nhập kỳ báo cáo, người nhập và nội dung.');let st=STAFF[+rpPerson.value];CTRL.reports.push({id:Date.now(),type:rpType.value,period:rpPeriod.value.trim(),person:st.name,area:rpArea.value,section:rpSection.value,content:rpContent.value.trim(),issue:rpIssue.value.trim(),next:rpNext.value.trim()});csave();rpContent.value='';rpIssue.value='';rpNext.value=''}
+function delReport2(id){CTRL.reports=CTRL.reports.filter(x=>x.id!==id);csave()}
+function renderReports2(){reportRows.innerHTML=CTRL.reports.map(x=>`<tr><td>${ce(x.type)} - ${ce(x.period)}</td><td>${ce(x.person)}</td><td>${ce(x.
+ookup();if(typeof renderDirectives==='function')renderDirectives()}
+  else if(isThuLamAdmin?.()) await syncSharedCTRL();
+ }catch(e){console.warn('Shared CTRL load failed:',e)}
+}
+window.addEventListener('load',()=>setTimeout(loadSharedCTRL,1200));
+window.addEventListener('focus',()=>{if(CTRL_SYNC_READY)setTimeout(loadSharedCTRL,200)});
+
+
+async function recoverLegacyDirectives(){
+ try{
+  if(typeof sb==='undefined')return;
+  ensureDirectives?.();
+  const {data,error}=await sb.from('xa_directives').select('*').order('id',{ascending:true});if(error||!data?.length)return;
+  const existing=new Set((CTRL.directives||[]).map(x=>String(x.no||x.document_no||'').trim()+'|'+String(x.title||'').trim()));
+  let changed=false;
+  for(const d of data){
+   const k=String(d.document_no||'').trim()+'|'+String(d.title||'').trim();if(existing.has(k))continue;
+   CTRL.directives.push({id:'legacy-'+d.id,no:d.document_no||'',date:d.issued_date||'',title:d.title||'',area:d.category||'Văn bản chỉ đạo',summary:d.summary||'',fileUrl:d.file_url||'',source:'xa_directives'});existing.add(k);changed=true;
+  }
+  if(changed){localStorage.setItem(CTRLKEY,JSON.stringify(CTRL));renderDirectives?.();renderDocumentLookup?.()}
+ }catch(e){console.warn('Legacy directive recovery skipped',e)}
+}
+
+function openCtrl(p){ctrlModal.style.display='block';switchCtrl(p)} function closeCtrl(){ctrlModal.style.display='none'}
+function switchCtrl(p){document.querySelectorAll('.ctrl-pane').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.ctrl-tab').forEach(x=>x.classList.toggle('active',x.dataset.c===p));document.getElementById('c-'+p)?.classList.add('active');renderCtrlAll()}
+function initCtrlSelects(){
+ const opts='<option value="">-- Chọn --</option>'+STAFF.map((x,i)=>`<option value="${i}">${ce(x.name)}</option>`).join('');
+ wOwner.innerHTML=opts;rpPerson.innerHTML=opts;wfPerson.innerHTML='<option value="">Tất cả thành viên</option>'+STAFF.map(x=>`<option>${ce(x.name)}</option>`).join('');
+ rpSection.innerHTML=REPORT_SECTIONS.map(x=>`<option>${ce(x)}</option>`).join('');
+ wOwner.onchange=()=>{let x=STAFF[+wOwner.value];wArea.value=x?.area||''};rpPerson.onchange=()=>{let x=STAFF[+rpPerson.value];rpArea.value=x?.area||''};
+}
+function dleft(d){if(!d)return null;let a=new Date();a.setHours(0,0,0,0);let b=new Date(d+'T00:00:00');return Math.ceil((b-a)/86400000)}
+function remain(d,status){if(status==='Đã hoàn thành')return '<span class="st-ok">Đã hoàn thành</span>';let n=dleft(d);if(n===null)return '';if(n<0)return `<span class="st-late">Quá ${Math.abs(n)} ngày</span>`;if(n<=3)return `<span class="st-warn">Còn ${n} ngày</span>`;return `Còn ${n} ngày`}
+function addMeetingTask(){if(!mhTask.value.trim())return alert('Nhập nhiệm vụ/văn bản giao.');CTRL.meetingTasks.push({id:Date.now(),task:mhTask.value.trim(),owner:mhOwner.value.trim(),product:mhProduct.value.trim(),due:mhDue.value});csave();mhTask.value='';mhOwner.value='';mhProduct.value='';mhDue.value=''}
+function delMeetingTask(id){CTRL.meetingTasks=CTRL.meetingTasks.filter(x=>x.id!==id);csave()}
+function renderMeetingTasks(){meetingTaskRows.innerHTML=CTRL.meetingTasks.map((x,i)=>`<tr><td>${i+1}</td><td>${ce(x.task)}</td><td>${ce(x.owner)}</td><td>${ce(x.product)}</td><td>${ce(x.due)}</td><td><button class="wh-smallbtn" onclick="delMeetingTask(${x.id})">Xóa</button></td></tr>`).join('')}
+function makeConclusion(){
+ const dt=mhDate.value?new Date(mhDate.value+'T00:00:00').toLocaleDateString('vi-VN'):'[CẦN BỔ SUNG]';
+ let tasks=CTRL.meetingTasks.length?CTRL.meetingTasks.map((x,i)=>`${i+1}. ${x.task}\n- Người/Bộ phận thực hiện: ${x.owner||'[CẦN BỔ SUNG]'}\n- Kết quả/Sản phẩm: ${x.product||'[CẦN BỔ SUNG]'}\n- Thời hạn hoàn thành: ${x.due?new Date(x.due+'T00:00:00').toLocaleDateString('vi-VN'):'[CẦN BỔ SUNG]'}`).join('\n\n'):'[CẦN BỔ SUNG]';
+ mhOutput.value=`BAN XÂY DỰNG ĐẢNG XÃ THƯ LÂM\n\nDỰ THẢO KẾT LUẬN HỌP BAN XÂY DỰNG ĐẢNG\n\nHôm nay, ngày ${dt}, tại ${mhPlace.value||'[CẦN BỔ SUNG]'}, Ban Xây dựng Đảng tổ chức họp.\n\nI. THÀNH PHẦN\n1. Chủ trì: ${mhChair.value||'[CẦN BỔ SUNG]'}\n2. Thư ký: ${mhSec.value||'[CẦN BỔ SUNG]'}\n3. Thành phần dự họp: ${mhAttend.value||'[CẦN BỔ SUNG]'}\n\nII. NỘI DUNG HỌP\n${mhAgenda.value||'[CẦN BỔ SUNG]'}\n\nIII. Ý KIẾN THẢO LUẬN VÀ NỘI DUNG THỐNG NHẤT\n${mhDiscuss.value||'[CẦN BỔ SUNG]'}\n\nIV. KẾT LUẬN CỦA ĐỒNG CHÍ CHỦ TRÌ\n${mhGeneral.value||'[CẦN BỔ SUNG]'}\n\nV. NHIỆM VỤ, SẢN PHẨM VÀ THỜI HẠN THỰC HIỆN\n${tasks}\n\nVI. TỔ CHỨC THỰC HIỆN\nCác đồng chí được giao nhiệm vụ chủ động tổ chức thực hiện, bảo đảm chất lượng và thời hạn; kịp thời báo cáo lãnh đạo Ban những khó khăn, vướng mắc phát sinh trong quá trình thực hiện. Kết quả thực hiện được cập nhật vào hệ thống theo dõi công việc để phục vụ công tác đôn đốc, tổng hợp.\n\n[Cán bộ kiểm tra, hoàn thiện trước khi sử dụng chính thức.]`;}
+function copyConclusion(){navigator.clipboard.writeText(mhOutput.value||'')}
+function saveWork(){
+ if(wOwner.value===''||!wTask.value.trim())return alert('Chọn người thực hiện và nhập nhiệm vụ/văn bản.');
+ let st=STAFF[+wOwner.value];CTRL.work.push({id:Date.now(),owner:st.name,area:wArea.value,type:wType.value,priority:wPriority.value,task:wTask.value.trim(),product:wProduct.value.trim(),inNo:wInNo.value.trim(),start:wStart.value,due:wDue.value,status:wStatus.value,progress:+wProgress.value||0,outNo:wOutNo.value.trim(),outDate:wOutDate.value,result:wResult.value.trim()});csave();wTask.value='';wProduct.value='';wInNo.value='';
+}
+function delWork2(id){CTRL.work=CTRL.work.filter(x=>x.id!==id);csave()}
+function inPeriod(x,mode){if(mode==='all')return true;let d=new Date((x.outDate||x.start||x.due||'1970-01-01')+'T00:00:00'),n=new Date();if(mode==='month')return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();let day=(n.getDay()+6)%7,st=new Date(n);st.setDate(n.getDate()-day);st.setHours(0,0,0,0);let en=new Date(st);en.setDate(st.getDate()+7);return d>=st&&d<en}
+function renderWork(){
+ let arr=CTRL.work.filter(x=>(!wfPerson.value||x.owner===wfPerson.value)&&(!wfStatus.value||x.status===wfStatus.value)&&inPeriod(x,wfPeriod.value));
+ workRows.innerHTML=arr.map(x=>`<tr><td><b>${ce(x.owner)}</b></td><td>${ce(x.area)}</td><td><small>${ce(x.type)}</small><br>${ce(x.task)}${x.inNo?'<br><b>VB vào:</b> '+ce(x.inNo):''}</td><td>${ce(x.product)}</td><td>${ce(x.due)}</td><td>${x.progress}%<br>${ce(x.status)}</td><td>${remain(x.due,x.status)}</td><td>${x.outNo?ce(x.outNo)+'<br>'+ce(x.outDate):''}</td><td>${x.outputFile?`<button class="wh-smallbtn" onclick="viewWorkOutputFile('${x.id}')">👁 Xem</button><br><small>${ce(x.outputFile)}</small>`:'—'}</td><td><button class="wh-smallbtn" onclick="delWork2(${x.id})">Xóa</button></td></tr>`).join('');
+ let all=CTRL.work,total=all.length,newc=all.filter(x=>x.status==='Chưa thực hiện').length,doing=all.filter(x=>['Đang thực hiện','Chờ phối hợp'].includes(x.status)).length,soon=all.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)>=0&&dleft(x.due)<=3).length,late=all.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)<0).length,done=all.filter(x=>x.status==='Đã hoàn thành').length;
+ wkTotal.textContent=total;wkNew.textContent=newc;wkDoing.textContent=doing;wkSoon.textContent=soon;wkLate.textContent=late;wkDone.textContent=done;workAlert.innerHTML=late?`⚠ Có <b>${late}</b> nhiệm vụ quá hạn; <b>${soon}</b> nhiệm vụ sắp đến hạn.`:`Không có nhiệm vụ quá hạn. Có ${soon} nhiệm vụ sắp đến hạn.`;
+ let docs=arr.filter(x=>x.outNo||x.type==='Văn bản tham mưu ban hành'),by={};docs.forEach(x=>by[x.owner]=(by[x.owner]||0)+1);workStats.textContent=Object.keys(by).length?Object.entries(by).map(([k,v])=>`${k}: ${v} văn bản`).join(' | '):'Chưa có văn bản ban hành trong phạm vi lọc.'
+}
+async function enableWorkNotify(){if(!('Notification'in window))return alert('Trình duyệt không hỗ trợ thông báo.');let p=await Notification.requestPermission();if(p==='granted')new Notification('Trung tâm AI - Ban Xây dựng Đảng',{body:'Đã bật nhắc việc. Khi mở Trung tâm mỗi ngày, hệ thống sẽ cảnh báo nhiệm vụ đến hạn/quá hạn.'})}
+function dailyWorkNotify(){if(!('Notification'in window)||Notification.permission!=='granted')return;let key='tl_work_notify_'+new Date().toISOString().slice(0,10);if(localStorage.getItem(key))return;let a=CTRL.work.filter(x=>x.status!=='Đã hoàn thành'&&dleft(x.due)<=1);if(a.length){new Notification('Nhắc việc Ban Xây dựng Đảng',{body:`Có ${a.length} nhiệm vụ đến hạn hoặc quá hạn cần kiểm tra.`});localStorage.setItem(key,'1')}}
+function exportWorkCSV(){let h=['Người thực hiện','Lĩnh vực','Loại','Văn bản/Nhiệm vụ','Kết quả/Sản phẩm','Ngày giao','Thời hạn','Trạng thái','Tiến độ','Số VB ban hành','Ngày ban hành','Kết quả thực tế'];let rows=CTRL.work.map(x=>[x.owner,x.area,x.type,x.task,x.product,x.start,x.due,x.status,x.progress,x.outNo,x.outDate,x.result]);let csv='\ufeff'+[h,...rows].map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\n');let b=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='Thong_ke_cong_viec_van_ban.csv';a.click()}
+function saveReportItem(){if(!rpPeriod.value.trim()||rpPerson.value===''||!rpContent.value.trim())return alert('Nhập kỳ báo cáo, người nhập và nội dung.');let st=STAFF[+rpPerson.value];CTRL.reports.push({id:Date.now(),type:rpType.value,period:rpPeriod.value.trim(),person:st.name,area:rpArea.value,section:rpSection.value,content:rpContent.value.trim(),issue:rpIssue.value.trim(),next:rpNext.value.trim()});csave();rpContent.value='';rpIssue.value='';rpNext.value=''}
+function delReport2(id){CTRL.reports=CTRL.reports.filter(x=>x.id!==id);csave()}
+function renderReports2(){reportRows.innerHTML=CTRL.reports.map(x=>`<tr><td>${ce(x.type)} - ${ce(x.period)}</td><td>${ce(x.person)}</td><td>${ce(x.area)}</td><td>${ce(x.section)}</td><td>${ce(x.content)}</td><td><button class="wh-smallbtn" onclick="delReport2(${x.id})">Xóa</button></td></tr>`).join('')}
+function buildFullReport(){
+ let type=rpType.value,period=rpPeriod.value.trim(),arr=CTRL.reports.filter(x=>x.type===type&&(!period||x.period===period));
+ let out=`PHỤ LỤC 1\nBÁO CÁO KẾT QUẢ ${type.toUpperCase()} ${period}\n-----\n\n`;
+ REPORT_SECTIONS.slice(2).forEach(sec=>{out+=sec+'\n';let a=arr.filter(x=>x.section===sec);if(a.length)a.forEach(x=>{out+=`- ${x.content}`;if(x.issue)out+=`\n  Khó khăn, vướng mắc: ${x.issue}`;if(x.next)out+=`\n  Nhiệm vụ kỳ tiếp theo/đề xuất: ${x.next}`;out+='\n'});else out+='[CHƯA CÓ NỘI DUNG NHẬP]\n';out+='\n'});
+ rpOutput.value=out
+}
+function downloadReport(){buildFullReport();let b=new Blob([rpOutput.value],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`Bao_cao_${rpType.value}_${rpPeriod.value||'tong_hop'}.txt`;a.click()}
+function addMonthsISO(iso,m){if(!iso||!m)return '';let d=new Date(iso+'T00:00:00'),day=d.getDate();d.setMonth(d.getMonth()+Number(m));if(d.getDate()<day)d.setDate(0);return d.toISOString().slice(0,10)}
+function salaryBaseDue(x){return addMonthsISO(x.lastDate,x.cycle)}
+function salaryNextDue(x){let due=salaryBaseDue(x);return (x.decision&&due&&x.cycle)?addMonthsISO(due,x.cycle):due}
+function salaryClass(x){let due=salaryNextDue(x),n=dleft(due);if(!x.lastDate||!x.cycle)return 'missing';if(n<0)return 'late';if(n<=30)return '30';if(n<=90)return '90';return 'ok'}
+function updateSalary(i,field,val){CTRL.salary[i][field]=val;csave()}
+function renderSalary2(){
+ let q=(slSearch.value||'').toLowerCase(),f=slFilter.value;let late=0,d30=0,d90=0,raised=0,miss=0;
+ CTRL.salary.forEach(x=>{let c=salaryClass(x);if(c==='late')late++;if(c==='30')d30++;if(c==='90')d90++;if(c==='missing')miss++;if(x.decision)raised++});
+ slTotal.textContent=CTRL.salary.length;slLate.textContent=late;sl30.textContent=d30;sl90.textContent=d90;slRaised.textContent=raised;slMissing.textContent=miss;
+ salaryRows2.innerHTML=CTRL.salary.map((x,i)=>[x,i]).filter(([x])=>(!q||x.name.toLowerCase().includes(q))&&(!f||salaryClass(x)===f)).map(([x,i])=>{let baseDue=salaryBaseDue(x),due=salaryNextDue(x),n=dleft(due),re
+arn('Không tải được danh sách cán bộ dùng chung:',e);renderTTStaff()}
+}
+function openStaffEditor(id=0){
+  if(!(isThuLamAdmin()))return alert('Chỉ quản trị viên được thay đổi danh sách cán bộ.');
+  const x=STAFF_REGISTRY.find(y=>y.id===Number(id));ttStaffEditId.value=x?.id||'';ttStaffName.value=x?.name||'';ttStaffTitle.value=x?.title||'';ttStaffArea.value=x?.area||'';ttStaffEditor.style.display='grid';ttStaffName.focus()
+}
+function closeStaffEditor(){ttStaffEditor.style.display='none';ttStaffEditId.value='';ttStaffName.value='';ttStaffTitle.value='';ttStaffArea.value=''}
+async function saveStaffMember(){
+  if(!(isThuLamAdmin()))return alert('Chỉ quản trị viên được thay đổi danh sách cán bộ.');
+  const id=Number(ttStaffEditId.value)||0,name=ttStaffName.value.trim().toUpperCase(),title=ttStaffTitle.value.trim(),area=ttStaffArea.value.trim();if(!name)return alert('Nhập họ và tên cán bộ.');
+  const old=STAFF_REGISTRY.find(x=>x.id===id),payload={name,title,area,is_active:true,updated_at:new Date().toISOString()};let error;
+  if(id){({error}=await sb.from('staff_members').update(payload).eq('id',id))}else{payload.sort_order=Math.max(0,...STAFF_REGISTRY.map(x=>Number(x.sort_order)||0))+1;({error}=await sb.from('staff_members').insert(payload))}
+  if(error)return alert('Không lưu được danh sách cán bộ: '+error.message);
+  if(old&&old.name!==name&&typeof CTRL!=='undefined'){CTRL.work?.forEach(x=>{if(x.owner===old.name)x.owner=name});CTRL.reports?.forEach(x=>{if(x.person===old.name)x.person=name});try{csave()}catch(e){}}
+  closeStaffEditor();await loadStaffRegistry();alert(id?'Đã cập nhật thông tin cán bộ.':'Đã thêm cán bộ mới.')
+}
+async function deleteStaffMember(id,name){
+  if(!(isThuLamAdmin()))return alert('Chỉ quản trị viên được thay đổi danh sách cán bộ.');if(!id)return alert('Không xác định được cán bộ cần xóa.');
+  if(!confirm(`Xóa ${name} khỏi danh sách cán bộ hiện tại?\n\nCác nhiệm vụ và văn bản cũ mang tên đồng chí này vẫn được giữ lại để tra cứu.`))return;
+  const {error}=await sb.from('staff_members').update({is_active:false,updated_at:new Date().toISOString()}).eq('id',id);if(error)return alert('Không xóa được cán bộ: '+error.message);await loadStaffRegistry();alert('Đã xóa cán bộ khỏi danh sách hiện tại.')
+}
+function populateNewUserStaff(){const el=document.getElementById('newUserStaff');if(!el)return;const cur=el.value;el.innerHTML='<option value="">-- Chọn cán bộ --</option>'+STAFF.map((x,i)=>`<option value="${i}">${ce(x.name)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur}
+window.addEventListener('load',()=>{loadStaffRegistry();setTimeout(()=>{try{renderTTStaff()}catch(e){}},700)});
+
+</script>
+
+<script>
+function toggleAISection(){const c=document.getElementById('ttAiContent'),b=document.getElementById('ttAiToggle');const o=c.style.display!=='none';c.style.display=o?'none':'block';b.textContent=o?'Mở ứng dụng AI ▾':'Thu gọn ứng dụng AI ▴'}
+function isoWeekValue(d=new Date()){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=x.getUTCDay()||7;x.setUTCDate(x.getUTCDate()+4-day);const y=new Date(Date.UTC(x.getUTCFullYear(),0,1));const w=Math.ceil((((x-y)/86400000)+1)/7);return x.getUTCFullYear()+'-W'+String(w).padStart(2,'0')}
+function dateInISOWeek(ds,wv){if(!ds||!wv)return false;let [yr,w]=wv.split('-W').map(Number),j=new Date(yr,0,4),dow=(j.getDay()+6)%7,st=new Date(yr,0,4-dow+(w-1)*7);st.setHours(0,0,0,0);let en=new Date(st);en.setDate(en.getDate()+7);let d=new Date(ds+'T00:00:00');return d>=st&&d<en}
+function setThisWeek(){ttWeekPick.value=isoWeekValue();renderStaffWorkCards()}
+renderStaffWorkCards=function(){if(!ttWeekPick.value)ttWeekPick.value=isoWeekValue();const work=(typeof CTRL!=='undefined'&&Array.isArray(CTRL.work))?CTRL.work:[],wk=ttWeekPick.value;ttStaffWorkCards.innerHTML=TT_STAFF_WORK.map(p=>{let a=work.filter(x=>x.owner===p.name&&dateInISOWeek(x.start||x.outDate||x.due,wk)),done=a.filter(x=>x.status==='Đã hoàn thành').length,active=a.filter(x=>x.status!=='Đã hoàn thành').length,late=a.filter(x=>x.status!=='Đã hoàn thành'&&ttDayLeft(x.due)<0).length,docs=a.filter(x=>x.outNo||x.type==='Văn bản tham mưu ban hành').length;return `<div class="tt-person-card" onclick="openStaffWork('${String(p.name).replaceAll("'","\\'")}')"><div class="tt-person-head"><div class="tt-avatar">${initialsTT(p.name)}</div><div><b>${ce(p.name)}</b><small>${ce(p.title)}</small></div></div><div class="tt-person-area">${ce(p.area)}</div><div class="tt-person-stats"><div class="tt-person-stat"><strong>${active}</strong><span>Đang theo dõi</span></div><div class="tt-person-stat"><strong>${done}</strong><span>Hoàn thành</span></div><div class="tt-person-stat"><strong>${docs}</strong><span>Văn bản</span></div></div><div class="tt-person-alert ${late?'late':'ok'}">${late?'⚠ '+late+' nhiệm vụ quá hạn':'✓ Không có nhiệm vụ quá hạn'}</div></div>`}).join('');let a=work.filter(x=>dateInISOWeek(x.start||x.outDate||x.due,wk));ttWeekSummary.textContent=`${wk}: ${a.length} nhiệm vụ/văn bản • ${a.filter(x=>x.status==='Đã hoàn thành').length} hoàn thành`}
+function refreshWorkUpdateSelect(){if(!window.wUpdateTask)return;let cur=wUpdateTask.value;wUpdateTask.innerHTML='<option value="">-- Chọn nhiệm vụ cần cập nhật --</option>'+CTRL.work.map(x=>`<option value="${x.id}">${ce(x.owner)} — ${ce(x.task).slice(0,80)}</option>`).join('');if([...wUpdateTask.options].some(o=>o.value===cur))wUpdateTask.value=cur}
+async function updateWorkResult(){let id=Number(wUpdateTask.value),x=CTRL.work.find(y=>y.id===id);if(!x)return alert('Chọn nhiệm vụ cần cập nhật.');const f=wUpdateFile?.files?.[0];const isDocTask=String(x.type||'').includes('Văn bản tham mưu ban hành')||/ban hành.{0,20}văn bản|văn bản.{0,20}ban hành/i.test([x.task,x.product].join(' '));if(isDocTask&&!f&&!x.outputFile)return alert('Nhiệm vụ này là ban hành văn bản. Bạn phải tải file văn bản/sản phẩm đã thực hiện trước khi lưu tiến độ.');if(f){try{await saveWorkOutputFile(id,f);x.outputFile=f.name;x.outputFileType=f.type||'';x.outputFileUpdated=new Date().toISOString()}catch(e){console.error(e);return alert('Không lưu được file văn bản. Vui lòng thử lại.')}}x.status=wUpdateStatus.value;x.progress=Number(wUpdateProgress.value)||0;x.outNo=wUpdateOutNo.value.trim();x.outDate=wUpdateOutDate.value;x.result=wUpdateResult.value.trim();x.resultNote=wUpdateNote.value.trim();csave();wUpdateResult.value='';wUpdateNote.value='';if(wUpdateFile)wUpdateFile.value='';refreshWorkUpdateSelect();renderWork();if(typeof renderDocumentLookup==='function')renderDocumentLookup()}
+saveWork=function(){if(wOwner.value===''||!wTask.value.trim())return alert('Chọn người thực hiện và nhập nhiệm vụ/văn bản.');let st=STAFF[+wOwner.value],f=wFile?.files?.[0];CTRL.work.push({id:Date.now(),owner:st.name,area:wArea.value,type:wType.value,priority:wPriority.value,task:wTask.value.trim(),product:wProduct.value.trim(),inNo:wInNo.value.trim(),inputFile:f?f.name:'',start:wStart.value,due:wDue.value,status:'Chưa thực hiện',progress:0,outNo:'',outDate:'',result:'',resultNote:''});csave();wTask.value='';wProduct.value='';wInNo.value='';if(wFile)wFile.value='';refreshWorkUpdateSelect()}
+
+
+function workFileKey(id){return 'work-'+String(id)}
+async function saveWorkOutputFile(id,file){return saveDirectiveFileBlob(workFileKey(id),file)}
+async function getWorkOutputFile(id){return getDirectiveFileBlob(workFileKey(id))}
+async function deleteWorkOutputFile(id){return deleteDirectiveFileBlob(workFileKey(id))}
+async function viewWorkOutputFile(id){try{const rec=await getWorkOutputFile(id);if(!rec?.blob)return alert('Không tìm thấy file văn bản đã thực hiện trên trình duyệt này.');const url=URL.createObjectURL(rec.blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){console.error(e);alert('Không xem được file.')}}
+async function downloadWorkOutputFile(id){try{const rec=await getWorkOutputFile(id);if(!rec?.blob)return alert('Không tìm thấy file văn bản đã thực hiện trên trình duyệt này.');const url=URL.createObjectURL(rec.blob),a=document.createElement('a');a.href=url;a.download=rec.name||'van-ban-da-thuc-hien';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}catch(e){console.error(e);alert('Không tải được file.')}}
+function editOutgoingDoc(id){const x=CTRL.work.find(y=>String(y.id)===String(id));if(!x)return;openCtrl('work');refreshWorkUpdateSelect();wUpdateTask.value=x.id;wUpdateStatus.value=x.status||'Đang thực hiện';wUpdateProgress.value=x.progress||0;wUpdateOutNo.value=x.outNo||'';wUpdateOutDate.value=x.outDate||'';wUpdateResult.value=x.result||'';wUpdateNote.value=x.resultNote||'';setTimeout(()=>wUpdateOutNo?.focus(),120)}
+async function deleteOutgoingDoc(id){const x=CTRL.work.find(y=>String(y.id)===String(id));if(!x)return;if(!confirm('Xóa văn bản đi này khỏi mục Tra cứu văn bản? Nhiệm vụ gốc vẫn được giữ lại.'))return;try{await deleteWorkOutputFile(id)}catch(_){}x.outNo='';x.outDate='';x.result='';x.resultNote='';x.outputFile='';x.outputFileType='';x.outputFileUpdated='';csave();renderWork();renderDocumentLookup()}
+
+
+function cloudFileSafeName(n){return String(n||'file').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120)}
+async function saveDirectiveFileBlob(id,file){
+ try{await saveDirectiveFileBlobLocal(id,file)}catch(e){}
+ try{
+  const sess=(await sb.auth.getSession()).data?.session;if(!sess)return true;
+  const key=String(id),path=`trung-tam-ai/${encodeURIComponent(key)}/${Date.now()}_${cloudFileSafeName(file.name)}`;
+  const old=(await sb.from('app_files').select('storage_path').eq('object_key',key).maybeSingle()).data;
+  const up=await sb.storage.from('kho-nghiep-vu-so').upload(path,file,{upsert:true,contentType:file.type||undefined});if(up.error)throw up.error;
+  const meta=await sb.from('app_files').upsert({object_key:key,storage_path:path,file_name:file.name,mime_type:file.type||'',updated_at:new Date().toISOString(),uploaded_by:sess.user.id},{onConflict:'object_key'});if(meta.error)throw meta.error;
+  if(old?.storage_path&&old.storage_path!==path)try{await sb.storage.from('kho-nghiep-vu-so').remove([old.storage_path])}catch(e){}
+  return true
+ }catch(e){console.warn('Cloud file save failed; kept local fallback',e);return true}
+}
+async function getDirectiveFileBlob(id){
+ try{
+  const key=String(id),{data}=await sb.from('app_files').select('*').eq('object_key',key).maybeSingle();
+  if(data?.storage_path){const r=await sb.storage.from('kho-nghiep-vu-so').download(data.storage_path);if(!r.error&&r.data)return {blob:r.data,name:data.file_name,type:data.mime_type}}
+ }catch(e){console.warn('Cloud file read failed',e)}
+ return getDirectiveFileBlobLocal(id)
+}
+async function deleteDirectiveFileBlob(id){
+ try{
+  const key=String(id),{data}=await sb.from('app_files').select('storage_path').eq('object_key',key).maybeSingle();
+  if(data?.storage_path)await sb.storage.from('kho-nghiep-vu-so').remove([data.storage_path]);await sb.from('app_files').delete().eq('object_key',key)
+ }catch(e){console.warn('Cloud file delete failed',e)}
+ try{return await deleteDirectiveFileBlobLocal(id)}catch(e){return true}
+}
+async function migrateLocalFilesToCloud(){
+ try{
+  if(!isThuLamAdmin?.())return;const db=await vdOpenDB();const tx=db.transaction(VD_STORE,'readonly'),st=tx.objectStore(VD_STORE);const req=st.getAll();
+  req.onsuccess=async()=>{for(const rec of req.result||[]){if(!rec?.blob)continue;try{const exists=(await sb.from('app_files').select('object_key').eq('object_key',String(rec.id)).maybeSingle()).data;if(!exists){const f=new File([rec.blob],rec.name||'file',{type:rec.type||rec.blob.type});await saveDirectiveFileBlob(rec.id,f)}}catch(e){}}}
+ }catch(e){console.warn('Local file migration skipped',e)}
+}
+window.addEventListener('load',()=>setTimeout(migrateLocalFilesToCloud,2500));
+
+const VD_DB_NAME='ThuLamDirectiveFiles';
+const VD_STORE='files';
+function openDirectiveDB(){
+ return new Promise((resolve,reject)=>{
+   const req=indexedDB.open(VD_DB_NAME,1);
+   req.onupgradeneeded=()=>{cons
+n deleteStaffMember(id,name){
+  if(!(isThuLamAdmin()))return alert('Chỉ quản trị viên được thay đổi danh sách cán bộ.');if(!id)return alert('Không xác định được cán bộ cần xóa.');
+  if(!confirm(`Xóa ${name} khỏi danh sách cán bộ hiện tại?\n\nCác nhiệm vụ và văn bản cũ mang tên đồng chí này vẫn được giữ lại để tra cứu.`))return;
+  const {error}=await sb.from('staff_members').update({is_active:false,updated_at:new Date().toISOString()}).eq('id',id);if(error)return alert('Không xóa được cán bộ: '+error.message);await loadStaffRegistry();alert('Đã xóa cán bộ khỏi danh sách hiện tại.')
+}
+function populateNewUserStaff(){const el=document.getElementById('newUserStaff');if(!el)return;const cur=el.value;el.innerHTML='<option value="">-- Chọn cán bộ --</option>'+STAFF.map((x,i)=>`<option value="${i}">${ce(x.name)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur}
+window.addEventListener('load',()=>{loadStaffRegistry();setTimeout(()=>{try{renderTTStaff()}catch(e){}},700)});
+
+</script>
+
+<script>
+function toggleAISection(){const c=document.getElementById('ttAiContent'),b=document.getElementById('ttAiToggle');const o=c.style.display!=='none';c.style.display=o?'none':'block';b.textContent=o?'Mở ứng dụng AI ▾':'Thu gọn ứng dụng AI ▴'}
+function isoWeekValue(d=new Date()){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=x.getUTCDay()||7;x.setUTCDate(x.getUTCDate()+4-day);const y=new Date(Date.UTC(x.getUTCFullYear(),0,1));const w=Math.ceil((((x-y)/86400000)+1)/7);return x.getUTCFullYear()+'-W'+String(w).padStart(2,'0')}
+function dateInISOWeek(ds,wv){if(!ds||!wv)return false;let [yr,w]=wv.split('-W').map(Number),j=new Date(yr,0,4),dow=(j.getDay()+6)%7,st=new Date(yr,0,4-dow+(w-1)*7);st.setHours(0,0,0,0);let en=new Date(st);en.setDate(en.getDate()+7);let d=new Date(ds+'T00:00:00');return d>=st&&d<en}
+function setThisWeek(){ttWeekPick.value=isoWeekValue();renderStaffWorkCards()}
+renderStaffWorkCards=function(){if(!ttWeekPick.value)ttWeekPick.value=isoWeekValue();const work=(typeof CTRL!=='undefined'&&Array.isArray(CTRL.work))?CTRL.work:[],wk=ttWeekPick.value;ttStaffWorkCards.innerHTML=TT_STAFF_WORK.map(p=>{let a=work.filter(x=>x.owner===p.name&&dateInISOWeek(x.start||x.outDate||x.due,wk)),done=a.filter(x=>x.status==='Đã hoàn thành').length,active=a.filter(x=>x.status!=='Đã hoàn thành').length,late=a.filter(x=>x.status!=='Đã hoàn thành'&&ttDayLeft(x.due)<0).length,docs=a.filter(x=>x.outNo||x.type==='Văn bản tham mưu ban hành').length;return `<div class="tt-person-card" onclick="openStaffWork('${String(p.name).replaceAll("'","\\'")}')"><div class="tt-person-head"><div class="tt-avatar">${initialsTT(p.name)}</div><div><b>${ce(p.name)}</b><small>${ce(p.title)}</small></div></div><div class="tt-person-area">${ce(p.area)}</div><div class="tt-person-stats"><div class="tt-person-stat"><strong>${active}</strong><span>Đang theo dõi</span></div><div class="tt-person-stat"><strong>${done}</strong><span>Hoàn thành</span></div><div class="tt-person-stat"><strong>${docs}</strong><span>Văn bản</span></div></div><div class="tt-person-alert ${late?'late':'ok'}">${late?'⚠ '+late+' nhiệm vụ quá hạn':'✓ Không có nhiệm vụ quá hạn'}</div></div>`}).join('');let a=work.filter(x=>dateInISOWeek(x.start||x.outDate||x.due,wk));ttWeekSummary.textContent=`${wk}: ${a.length} nhiệm vụ/văn bản • ${a.filter(x=>x.status==='Đã hoàn thành').length} hoàn thành`}
+function refreshWorkUpdateSelect(){if(!window.wUpdateTask)return;let cur=wUpdateTask.value;wUpdateTask.innerHTML='<option value="">-- Chọn nhiệm vụ cần cập nhật --</option>'+CTRL.work.map(x=>`<option value="${x.id}">${ce(x.owner)} — ${ce(x.task).slice(0,80)}</option>`).join('');if([...wUpdateTask.options].some(o=>o.value===cur))wUpdateTask.value=cur}
+async function updateWorkResult(){let id=Number(wUpdateTask.value),x=CTRL.work.find(y=>y.id===id);if(!x)return alert('Chọn nhiệm vụ cần cập nhật.');const f=wUpdateFile?.files?.[0];const isDocTask=String(x.type||'').includes('Văn bản tham mưu ban hành')||/ban hành.{0,20}văn bản|văn bản.{0,20}ban hành/i.test([x.task,x.product].join(' '));if(isDocTask&&!f&&!x.outputFile)return alert('Nhiệm vụ này là ban hành văn bản. Bạn phải tải file văn bản/sản phẩm đã thực hiện trước khi lưu tiến độ.');if(f){try{await saveWorkOutputFile(id,f);x.outputFile=f.name;x.outputFileType=f.type||'';x.outputFileUpdated=new Date().toISOString()}catch(e){console.error(e);return alert('Không lưu được file văn bản. Vui lòng thử lại.')}}x.status=wUpdateStatus.value;x.progress=Number(wUpdateProgress.value)||0;x.outNo=wUpdateOutNo.value.trim();x.outDate=wUpdateOutDate.value;x.result=wUpdateResult.value.trim();x.resultNote=wUpdateNote.value.trim();csave();wUpdateResult.value='';wUpdateNote.value='';if(wUpdateFile)wUpdateFile.value='';refreshWorkUpdateSelect();renderWork();if(typeof renderDocumentLookup==='function')renderDocumentLookup()}
+saveWork=function(){if(wOwner.value===''||!wTask.value.trim())return alert('Chọn người thực hiện và nhập nhiệm vụ/văn bản.');let st=STAFF[+wOwner.value],f=wFile?.files?.[0];CTRL.work.push({id:Date.now(),owner:st.name,area:wArea.value,type:wType.value,priority:wPriority.value,task:wTask.value.trim(),product:wProduct.value.trim(),inNo:wInNo.value.trim(),inputFile:f?f.name:'',start:wStart.value,due:wDue.value,status:'Chưa thực hiện',progress:0,outNo:'',outDate:'',result:'',resultNote:''});csave();wTask.value='';wProduct.value='';wInNo.value='';if(wFile)wFile.value='';refreshWorkUpdateSelect()}
+
+
+function workFileKey(id){return 'work-'+String(id)}
+async function saveWorkOutputFile(id,file){return saveDirectiveFileBlob(workFileKey(id),file)}
+async function getWorkOutputFile(id){return getDirectiveFileBlob(workFileKey(id))}
+async function deleteWorkOutputFile(id){return deleteDirectiveFileBlob(workFileKey(id))}
+async function viewWorkOutputFile(id){try{const rec=await getWorkOutputFile(id);if(!rec?.blob)return alert('Không tìm thấy file văn bản đã thực hiện trên trình duyệt này.');const url=URL.createObjectURL(rec.blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){console.error(e);alert('Không xem được file.')}}
+async function downloadWorkOutputFile(id){try{const rec=await getWorkOutputFile(id);if(!rec?.blob)return alert('Không tìm thấy file văn bản đã thực hiện trên trình duyệt này.');const url=URL.createObjectURL(rec.blob),a=document.createElement('a');a.href=url;a.download=rec.name||'van-ban-da-thuc-hien';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}catch(e){console.error(e);alert('Không tải được file.')}}
+function editOutgoingDoc(id){const x=CTRL.work.find(y=>String(y.id)===String(id));if(!x)return;openCtrl('work');refreshWorkUpdateSelect();wUpdateTask.value=x.id;wUpdateStatus.value=x.status||'Đang thực hiện';wUpdateProgress.value=x.progress||0;wUpdateOutNo.value=x.outNo||'';wUpdateOutDate.value=x.outDate||'';wUpdateResult.value=x.result||'';wUpdateNote.value=x.resultNote||'';setTimeout(()=>wUpdateOutNo?.focus(),120)}
+async function deleteOutgoingDoc(id){const x=CTRL.work.find(y=>String(y.id)===String(id));if(!x)return;if(!confirm('Xóa văn bản đi này khỏi mục Tra cứu văn bản? Nhiệm vụ gốc vẫn được giữ lại.'))return;try{await deleteWorkOutputFile(id)}catch(_){}x.outNo='';x.outDate='';x.result='';x.resultNote='';x.outputFile='';x.outputFileType='';x.outputFileUpdated='';csave();renderWork();renderDocumentLookup()}
+
+
+function cloudFileSafeName(n){return String(n||'file').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120)}
+async function saveDirectiveFileBlob(id,file){
+ try{await saveDirectiveFileBlobLocal(id,file)}catch(e){}
+ try{
+  const sess=(await sb.auth.getSession()).data?.session;if(!sess)return true;
+  const key=String(id),path=`trung-tam-ai/${encodeURIComponent(key)}/${Date.now()}_${cloudFileSafeName(file.name)}`;
+  const old=(await sb.from('app_files').select('storage_path').eq('object_key',key).maybeSingle()).data;
+  const up=await sb.storage.from('kho-nghiep-vu-so').upload(path,file,{upsert:true,contentType:file.type||undefined});if(up.error)throw up.error;
+  const meta=await sb.from('app_files').upsert({object_key:key,storage_path:path,file_name:file.name,mime_type:file.type||'',updated_at:new Date().toISOString(),uploaded_by:sess.user.id},{onConflict:'object_key'});if(meta.error)throw meta.error;
+  if(old?.storage_path&&old.storage_path!==path)try{await sb.storage.from('kho-nghiep-vu-so').remove([old.storage_path])}catch(e){}
+  return true
+ }catch(e){console.warn('Cloud file save failed; kept local fallback',e);return true}
+}
+async function getDirectiveFileBlob(id){
+ try{
+  const key=String(id),{data}=await sb.from('app_files').select('*').eq('object_key',key).maybeSingle();
+  if(data?.storage_path){const r=await sb.storage.from('kho-nghiep-vu-so').download(data.storage_path);if(!r.error&&r.data)return {blob:r.data,name:data.file_name,type:data.mime_type}}
+ }catch(e){console.warn('Cloud file read failed',e)}
+ return getDirectiveFileBlobLocal(id)
+}
+async function deleteDirectiveFileBlob(id){
+ try{
+  const key=String(id),{data}=await sb.from('app_files').select('storage_path').eq('object_key',key).maybeSingle();
+  if(data?.storage_path)await sb.storage.from('kho-nghiep-vu-so').remove([data.storage_path]);await sb.from('app_files').delete().eq('object_key',key)
+ }catch(e){console.warn('Cloud file delete failed',e)}
+ try{return await deleteDirectiveFileBlobLocal(id)}catch(e){return true}
+}
+async function migrateLocalFilesToCloud(){
+ try{
+  if(!isThuLamAdmin?.())return;const db=await vdOpenDB();const tx=db.transaction(VD_STORE,'readonly'),st=tx.objectStore(VD_STORE);const req=st.getAll();
+  req.onsuccess=async()=>{for(const rec of req.result||[]){if(!rec?.blob)continue;try{const exists=(await sb.from('app_files').select('object_key').eq('object_key',String(rec.id)).maybeSingle()).data;if(!exists){const f=new File([rec.blob],rec.name||'file',{type:rec.type||rec.blob.type});await saveDirectiveFileBlob(rec.id,f)}}catch(e){}}}
+ }catch(e){console.warn('Local file migration skipped',e)}
+}
+window.addEventListener('load',()=>setTimeout(migrateLocalFilesToCloud,2500));
+
+const VD_DB_NAME='ThuLamDirectiveFiles';
+const VD_STORE='files';
+function openDirectiveDB(){
+ return new Promise((resolve,reject)=>{
+   const req=indexedDB.open(VD_DB_NAME,1);
+   req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(VD_STORE))db.createObjectStore(VD_STORE,{keyPath:'id'})};
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)
+ })
+}
+async function saveDirectiveFileBlobLocal(id,file){
+ const db=await openDirectiveDB();
+ return new Promise((resolve,reject)=>{
+   const tx=db.transaction(VD_STORE,'readwrite');
+   tx.objectStore(VD_STORE).put({id,blob:file,name:file.name,type:file.type||''});
+   tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}
+ })
+}
+async function getDirectiveFileBlobLocal(id){
+ const db=await openDirectiveDB();
+ return new Promise((resolve,reject)=>{
+   const tx=db.transaction(VD_STORE,'readonly'),req=tx.objectStore(VD_STORE).get(id);
+   req.onsuccess=()=>{db.close();resolve(req.result||null)};req.onerror=()=>{db.close();reject(req.error)}
+ })
+}
+async function deleteDirectiveFileBlobLocal(id){
+ const db=await openDirectiveDB();
+ return new Promise((resolve,reject)=>{
+   const tx=db.transaction(VD_STORE,'readwrite');tx.objectStore(VD_STORE).delete(id);
+   tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}
+ })
+}
+async function downloadDirectiveFile(id,name){
+ try{
+   const rec=await getDirectiveFileBlob(id);
+   if(!rec?.blob)return alert('Không tìm thấy tệp gốc trên trình duyệt này. Có thể văn bản được lưu từ bản Trung tâm cũ chỉ lưu tên tệp.');
+   const url=URL.createObjectURL(rec.blob),a=document.createElement('a');a.href=url;a.download=name||rec.name||'van-ban';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)
+ }catch(e){console.error(e);alert('Không tải được tệp văn bản.')}
+}
+async funct
+2.25});const cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);await p.render({canvasContext:cv.getContext('2d',{willReadFrequently:true}),viewport:vp}).promise;const r=await worker.recognize(cv);out+='\n\n--- Trang '+i+' ---\n'+(r.data?.text||'')}}finally{await worker.terminate()}return out.trim();}
+ async function run(){const ta=pickTextArea();if(!ta)throw new Error('Không tìm thấy ô Nội dung trích xuất');const status=[...document.querySelectorAll('div,p,span')].find(x=>/^Đã đọc:|^PDF scan:|^Đang OCR/i.test(x.textContent.trim()))||ta.parentElement?.nextElementSibling||document.body;const d=selected();status.textContent='Đang lấy file PDF đã lưu...';const blob=await blobFor(d);if(!blob)throw new Error('Không lấy được file PDF từ kho lưu trữ.');const text=await readPdf(blob,status);if(norm(text).length<40)throw new Error('OCR chưa nhận đủ nội dung. Hãy kiểm tra chất lượng bản scan.');ta.value=text;ta.dispatchEvent(new Event('input',{bubbles:true}));ta.dispatchEvent(new Event('change',{bubbles:true}));window.__thuLamDirectiveExtract=text;status.textContent='Đã đọc đầy đủ: '+text.length.toLocaleString('vi-VN')+' ký tự. Có thể bấm “Phân tích & đề xuất giao việc”.';}
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!/^\s*📖?\s*Đọc văn bản đã lưu/i.test(b.textContent||''))return;e.preventDefault();e.stopImmediatePropagation();b.disabled=true;run().catch(err=>{console.error(err);alert('Không đọc được văn bản: '+err.message)}).finally(()=>b.disabled=false)},true);
+})();
+</script>
+
+
+
+
+
+
+
+<script id="v849-party-flag-runtime">
+(()=>{
+ const SRC='assets/co-dang-chuan.png?v=849';
+ function apply(root=document){
+   const imgs=[];
+   if(root.matches?.('img')) imgs.push(root);
+   root.querySelectorAll?.('img').forEach(i=>imgs.push(i));
+   imgs.forEach(img=>{
+     const alt=(img.getAttribute('alt')||'').toLowerCase();
+     const src=(img.getAttribute('src')||'').toLowerCase();
+     const cls=(img.className||'').toString().toLowerCase();
+     if(!(alt.includes('cờ đảng')||alt.includes('co dang')||src.includes('co-dang-chuan')||cls.includes('party-flag'))) return;
+     img.src=SRC;
+     img.style.setProperty('display','block','important');
+     img.style.setProperty('width','100%','important');
+     img.style.setProperty('height','100%','important');
+     img.style.setProperty('object-fit','contain','important');
+     img.style.setProperty('object-position','center center','important');
+   });
+   root.querySelectorAll?.('.party-emblem,.party-logo,.dang-emblem,.dang-logo').forEach(el=>{
+     el.style.setProperty('background-image',`url(${SRC})`,'important');
+     el.style.setProperty('background-size','contain','important');
+     el.style.setProperty('background-position','center center','important');
+     el.style.setProperty('background-repeat','no-repeat','important');
+     el.style.setProperty('background-color','#df291f','important');
+   });
+ }
+ const go=()=>{apply(document);setTimeout(()=>apply(document),300);setTimeout(()=>apply(document),1200)};
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
+ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)apply(n)}))).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+<script id="v850-ai-assignment-refine">
+(()=>{
+ const clean=t=>String(t||'').replace(/\s+/g,' ').trim();
+ const low=t=>clean(t).toLowerCase();
+ function area(text){const t=low(text);if(/cán bộ|biên chế|đánh giá|xếp loại|bổ nhiệm|quy hoạch|điều động|đào tạo|bồi dưỡng|chính sách cán bộ/.test(t))return 'Tổ chức, cán bộ';if(/đảng viên|chi bộ|tổ chức đảng|kết nạp|chuyển chính thức|sinh hoạt đảng|huy hiệu đảng/.test(t))return 'Đảng, đảng viên';if(/tuyên giáo|tuyên truyền|dư luận|báo chí|văn hóa|tư tưởng|chỉ thị 24/.test(t))return 'Tuyên giáo';return 'Công tác tổng hợp';}
+ function task(text){const t=clean(text);let m=t.match(/(?:giao|yêu cầu|đề nghị)[^.;:]{0,100}(?:ban xây dựng đảng|đảng ủy|cấp ủy)?[^.;]{8,220}/i);if(m)return 'Tham mưu triển khai thực hiện '+clean(m[0]).replace(/^(giao|yêu cầu|đề nghị)\s*/i,'').replace(/[.;,]+$/,'');let title=t.match(/(?:kế hoạch|chỉ thị|quy định|hướng dẫn|công văn|thông báo)\s+(?:số\s*)?[^.;\n]{3,90}/i);return title?'Tham mưu triển khai thực hiện '+clean(title[0]):'Tham mưu triển khai thực hiện nội dung văn bản chỉ đạo';}
+ function product(text){const t=low(text);if(/báo cáo|tổng hợp kết quả/.test(t))return 'Tham mưu văn bản triển khai thực hiện và báo cáo kết quả theo yêu cầu của văn bản';if(/kế hoạch/.test(t))return 'Tham mưu văn bản triển khai, tổ chức thực hiện Kế hoạch';if(/chỉ thị/.test(t))return 'Tham mưu văn bản triển khai, tổ chức thực hiện Chỉ thị';return 'Tham mưu văn bản triển khai, tổ chức thực hiện theo yêu cầu của văn bản';}
+ function table(){return [...document.querySelectorAll('table')].find(x=>{const h=low(x.tHead?.innerText||x.querySelector('thead')?.innerText||'');return h.includes('nhiệm vụ/văn bản')&&h.includes('người thực hiện')&&h.includes('kết quả/sản phẩm')});}
+ function source(){const ta=[...document.querySelectorAll('textarea')].find(x=>/nội dung trích xuất|trích xuất/i.test((x.placeholder||'')+' '+(x.previousElementSibling?.innerText||'')));return clean(ta?.value||window.__thuLamDirectiveExtract||'');}
+ function setControl(cell,val,blank=false){const e=cell?.querySelector('textarea,input,select');if(!e)return false;if(e.tagName==='SELECT'){if(blank){e.value='';e.selectedIndex=0;}else{const o=[...e.options].find(o=>low(o.textContent)===low(val)||low(o.textContent).includes(low(val)));if(o)e.value=o.value;else return false}}else e.value=blank?'':val;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true;}
+ function refine(){const tb=table();if(!tb)return false;const rows=[...tb.querySelectorAll('tbody tr')];if(!rows.length)return false;const text=source()||clean(rows.map(r=>r.cells?.[1]?.innerText||'').join(' '));const first=rows[0];rows.slice(1).forEach(r=>r.remove());const c=first.cells;if(!c||c.length<7)return false;setControl(c[1],task(text));if(!c[1].querySelector('textarea,input')){c[1].contentEditable='true';c[1].innerText=task(text)}setControl(c[2],area(text));setControl(c[3],'',true);setControl(c[4],'',true);setControl(c[5],product(text));const headers=[...tb.querySelectorAll('thead th')];headers.forEach(h=>{if(/nhiệm vụ\/văn bản/i.test(h.innerText))h.innerText='Nhiệm vụ cụ thể cần thực hiện';if(/kết quả\/sản phẩm/i.test(h.innerText))h.innerText='Sản phẩm cần hoàn thành'});return true;}
+ let timer=null;const obs=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(refine,120)});const start=()=>{obs.observe(document.body,{childList:true,subtree:true});refine()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&/phân tích.*đề xuất giao việc/i.test(b.innerText||''))setTimeout(refine,250)},true);
+})();
+</script>
+</body>
+</html>
+
+
+===== CẦN LÃNH ĐẠO XÁC ĐỊNH =====
+
+đọc Word.');
+    const buf=await rec.blob.arrayBuffer(),res=await mammoth.extractRawText({arrayBuffer:buf});
+    text=res.value||'';
+  }else{
+    throw new Error('AI hiện hỗ trợ đọc PDF và DOCX.');
+  }
+  return {text,meta,name:rec.name||meta.file||''}
+}
+async function readSelectedDirective(){
+  const id=Number(aiDirectiveSelect.value);
+  if(!id)return alert('Chọn một văn bản đã lưu trong Văn bản chỉ đạo.');
+  aiReadStatus.textContent='Đang đọc văn bản đã lưu...';
+  try{
+    const r=await readSavedDirectiveBlobText(id);
+    aiDocText.value=r.text.trim();
+    aiDocNo.value=r.meta.no||'';
+    aiDocDate.value=r.meta.date||'';
+    aiReadStatus.innerHTML=`<b>Đã đọc:</b> ${ce(r.name)} • ${r.text.length.toLocaleString('vi-VN')} ký tự.`;
+  }catch(e){console.error(e);aiReadStatus.textContent='Không đọc được văn bản: '+e.message}
+}
+async function openDirectiveInAI(id){
+  AI_SELECTED_DIRECTIVE_ID=id;
+  openCtrl('aiassign');
+  refreshAIDirectiveSelect();
+  aiDirectiveSelect.value=String(id);
+  syncSelectedDirectiveInfo();
+  await readSelectedDirective();
+}
+function renderRecentDirectives(){
+  if(!window.ttRecentDirectives)return;
+  ensureDirectives();
+  const list=[...CTRL.directives].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,6);
+  if(!list.length){
+    ttRecentDirectives.innerHTML='<div style="padding:10px;color:#75685f;font-size:12px">Chưa có văn bản chỉ đạo đã lưu.</div>';
+    return;
+  }
+  ttRecentDirectives.innerHTML=list.map(x=>`<div class="tt-recent-row">
+    <div class="tt-recent-date">${ce(x.date||'')}</div>
+    <div class="tt-recent-main"><b>${ce(x.no||'Không số')}</b><span>${ce(x.title||'')}</span><small>${ce(x.area||'Chưa phân lĩnh vực')}</small></div>
+    <div class="tt-recent-actions">${x.file?`<button onclick="viewDirectiveFile(${x.id},'${String(x.file).replaceAll("'","\\'")}','${String(x.fileType||'').replaceAll("'","\\'")}')" title="Xem văn bản">👁</button>`:''}<button onclick="openDirectiveInAI(${x.id})" title="AI phân tích và đề xuất giao việc">🤖</button></div>
+  </div>`).join('');
+}
+
+
+const AI_RULES=[
+ {area:'Phụ trách công tác tổ chức, cán bộ',keys:['cán bộ','bổ nhiệm','điều động','quy hoạch','biên chế','nâng lương','chức danh','nhân sự','đánh giá cán bộ','đào tạo','bồi dưỡng','bảo vệ chính trị nội bộ']},
+ {area:'Phụ trách công tác Đảng, đảng viên',keys:['đảng viên','kết nạp','chuyển đảng chính thức','huy hiệu đảng','sinh hoạt chi bộ','tổ chức đảng','chi bộ','đảng bộ','phiếu đảng viên','chuyển sinh hoạt']},
+ {area:'Phụ trách công tác Tuyên giáo',keys:['tuyên giáo','tuyên truyền','dư luận xã hội','thông tin tuyên truyền','học tập và làm theo','lý luận chính trị','bản tin','báo chí','không gian mạng']},
+ {area:'Phụ trách chung',keys:['báo cáo chung','tổng hợp chung','chương trình công tác','kế hoạch chung','kết luận họp ban','tham mưu tổng hợp']},
+];
+
+function aiStaffForArea(area){
+ const exact=TT_STAFF_WORK.filter(x=>x.area===area);
+ return exact.length?exact:TT_STAFF_WORK.filter(x=>String(x.area||'').toLowerCase().includes(String(area||'').toLowerCase().replace('phụ trách ','')));
+}
+function splitAITasks(text){
+ let raw=String(text||'').replace(/\r/g,'\n').replace(/\n{2,}/g,'\n').trim();
+ if(!raw)return [];
+ let lines=raw.split('\n').map(x=>x.trim()).filter(Boolean);
+ let candidates=[];
+ lines.forEach(line=>{
+   let cleaned=line.replace(/^[\-\+\•\*\d\.\)\(]+\s*/,'').trim();
+   if(cleaned.length<18)return;
+   if(/^(căn cứ|kính gửi|nơi nhận|đảng cộng sản|ủy ban|ban xây dựng|số:|ngày)/i.test(cleaned))return;
+   if(/(giao|đề nghị|yêu cầu|thực hiện|tham mưu|rà soát|tổng hợp|báo cáo|triển khai|hoàn thành|phối hợp|ban hành|xây dựng|chuẩn bị|đôn đốc)/i.test(cleaned)){
+     candidates.push(cleaned)
+   }
+ });
+ if(!candidates.length){
+   const sentences=raw.split(/(?<=[\.\;\:])\s+/).map(x=>x.trim()).filter(x=>x.length>30);
+   candidates=sentences.filter(x=>/(giao|đề nghị|yêu cầu|thực hiện|tham mưu|rà soát|tổng hợp|báo cáo|triển khai|hoàn thành|phối hợp|ban hành|xây dựng|chuẩn bị|đôn đốc)/i.test(x));
+ }
+ return [...new Set(candidates)].slice(0,30);
+}
+function classifyAITask(task){
+ let t=task.toLowerCase(),best={area:'',score:0};
+ AI_RULES.forEach(r=>{let score=r.keys.reduce((n,k)=>n+(t.includes(k)?1:0),0);if(score>best.score)best={area:r.area,score}});
+ if(!best.area){
+   const staffHit=TT_STAFF_WORK.find(x=>String(x.area||'').split(',').some(k=>k.length>4&&t.includes(k.toLowerCase().trim())));
+   if(staffHit)best={area:staffHit.area,score:1}
+ }
+ return best
+}
+function inferAIProduct(task){
+ const t=task.toLowerCase();
+ if(t.includes('báo cáo'))return 'Báo cáo';
+ if(t.includes('quyết định')||t.includes('ban hành quyết định'))return 'Dự thảo/Quyết định';
+ if(t.includes('kế hoạch'))return 'Kế hoạch';
+ if(t.includes('công văn'))return 'Công văn';
+ if(t.includes('tờ trình'))return 'Tờ trình';
+ if(t.includes('tổng hợp'))return 'Bảng/Danh sách tổng hợp';
+ if(t.includes('rà soát'))return 'Kết quả rà soát/Tổng hợp';
+ if(t.includes('tham mưu'))return 'Dự thảo văn bản tham mưu';
+ return '[CẦN LÃNH ĐẠO XÁC ĐỊNH]'
+}
+function inferAIDeadline(task,fullText){
+ const txt=task+' '+fullText;
+ let m=txt.match(/(?:trước|chậm nhất|hoàn thành trước)\s+(?:ngày\s*)?(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i);
+ if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+ let m2=txt.match(/ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/i);
+ if(m2)return `${m2[3]}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
+ return ''
+}
+function sourceExcerpt(task,text){
+ let idx=text.toLowerCase().indexOf(task.toLowerCase().slice(0,30));
+ if(idx<0)return task.slice(0,240);
+ return text.slice(Math.max(0,idx-80),Math.min(text.length,idx+task.length+120)).replace(/\n+/g,' ')
+}
+async function readAIDocument(){
+ const f=aiDocFile.files?.[0];
+ if(!f)return alert('Chọn file PDF hoặc DOCX.');
+ aiReadStatus.textContent='Đang đọc văn bản...';
+ try{
+   let text='';
+   if(f.name.toLowerCase().endsWith('.pdf')){
+     if(!window.pdfjsLib)throw new Error('Chưa tải được thư viện đọc PDF.');
+     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+     const buf=await f.arrayBuffer(),pdf=await pdfjsLib.getDocument({data:buf}).promise;
+     let parts=[];
+     for(let i=1;i<=pdf.numPages;i++){
+       const page=await pdf.getPage(i),content=await page.getTextContent();
+       parts.push(content.items.map(x=>x.str).join(' '))
+     }
+     text=parts.join('\n')
+   }else if(f.name.toLowerCase().endsWith('.docx')){
+     if(!window.mammoth)throw new Error('Chưa tải được thư viện đọc Word.');
+     const buf=await f.arrayBuffer(),res=await mammoth.extractRawText({arrayBuffer:buf});
+     text=res.value||''
+   }else throw new Error('Bản thử nghiệm hỗ trợ PDF và DOCX.');
+   aiDocText.value=text.trim();
+   aiReadStatus.innerHTML=`<b>Đã đọc:</b> ${ce(f.name)} • ${text.length.toLocaleString('vi-VN')} ký tự.`;
+ }catch(e){console.error(e);aiReadStatus.textContent='Không đọc được file: '+e.message}
+}
+function analyzeAIDocument(){
+ const text=aiDocText.value.trim();if(!text)return alert('Chưa có nội dung văn bản để phân tích.');
+ const tasks=splitAITasks(text);
+ AI_PROPOSALS=tasks.map((task,i)=>{
+   const cls=classifyAITask(task),people=aiStaffForArea(cls.area),lead=people[0]?.name||'',coord=people.slice(1).map(x=>x.name).join(', ');
+   return {id:Date.now()+i,selected:true,task,area:cls.area||'[CẦN XÁC ĐỊNH]',lead,coord,product:inferAIProduct(task),due:inferAIDeadline(task,text),source:sourceExcerpt(task,text),review:!cls.area||!lead}
+ });
+ renderAIProposals();
+ aiReadStatus.innerHTML=`Đã phân tích văn bản. Phát hiện <b>${AI_PROPOSALS.length}</b> nội dung có dấu hiệu là nhiệm vụ cần theo dõi.`
+}
+function renderAIProposals(){
+ aiTaskCount.textContent=AI_PROPOSALS.length;
+ aiNeedReview.textContent=AI_PROPOSALS.filter(x=>x.review||!x.lead).length;
+ aiHasDeadline.textContent=AI_PROPOSALS.filter(x=>x.due).length;
+ const staffOptions=TT_STAFF_WORK.map(x=>`<option>${ce(x.name)}</option>`).join('');
+ aiAssignRows.innerHTML=AI_PROPOSALS.map((x,i)=>`<tr>
+   <td><input type="checkbox" ${x.selected?'checked':''} onchange="AI_PROPOSALS[${i}].selected=this.checked"></td>
+   <td>${ce(x.task)}</td>
+   <td><input class="ai-inline-input" value="${ce(x.area)}" onchange="AI_PROPOSALS[${i}].area=this.value"></td>
+   <td>
+     <select class="ai-inline-select ai-person-select" onchange="AI_PROPOSALS[${i}].lead=this.value;AI_PROPOSALS[${i}].review=!this.value;renderAIProposals()">
+       <option value="">-- Lãnh đạo chọn người thực hiện --</option>
+       ${TT_STAFF_WORK.map(p=>`<option ${p.name===x.lead?'selected':''}>${ce(p.name)}</option>`).join('')}
+     </select>
+     ${x.lead?`<div class="ai-ok">Đang chọn: ${ce(x.lead)}</div>`:'<div class="ai-review">Chưa chọn người thực hiện</div>'}
+   </td>
+   <td><input class="ai-inline-input" value="${ce(x.coord)}" onchange="AI_PROPOSALS[${i}].coord=this.value"></td>
+   <td><input class="ai-inline-input" value="${ce(x.product)}" onchange="AI_PROPOSALS[${i}].product=this.value"></td>
+   <td><input type="date" class="ai-inline-input" value="${ce(x.due)}" onchange="AI_PROPOSALS[${i}].due=this.value"></td>
+   <td><button class="ai-source-btn" onclick="showAISource(${i})">Xem căn cứ</button></td>
+ </tr>`).join('')
+}
+function showAISource(i){
+ const x=AI_PROPOSALS[i];alert('Đoạn văn bản làm căn cứ:\n\n'+(x?.source||''))
+}
+function clearAIAnalysis(){AI_PROPOSALS=[];aiDocText.value='';aiAssignRows.innerHTML='';aiTaskCount.textContent=aiNeedReview.textContent=aiHasDeadline.textContent='0';syncSelectedDirectiveInfo()}
+function approveAIAssignments(){
+ if(!AI_PROPOSALS.length)return alert('Chưa có đề xuất giao việc.');
+ const chosen=AI_PROPOSALS.filter(x=>x.selected);
+ if(!chosen.length)return alert('Chưa chọn nhiệm vụ nào.');
+ const unresolved=chosen.filter(x=>!x.lead||!x.area||x.area.startsWith('['));
+ if(unresolved.length){
+   alert(`Còn ${unresolved.length} nhiệm vụ chưa được lãnh đạo chọn người thực hiện hoặc chưa xác định lĩnh vực. Vui lòng hoàn thiện trước khi duyệt.`);
+   return;
+ }
+ let count=0;
+ chosen.filter(x=>x.lead&&x.area&&!x.area.startsWith('[')).forEach(x=>{
+   CTRL.work.push({
+     id:Date.now()+count,owner:x.lead,area:x.area,type:'Văn bản chỉ đạo - AI đề xuất',
+     priority:'Bình thường',task:x.task,product:x.product,inNo:aiDocNo.value.trim(),
+     inputFile:(CTRL.directives.find(v=>v.id===Number(aiDirectiveSelect.value))?.file||''),start:new Date().toISOString().slice(0,10),
+     due:x.due,status:'Chưa thực hiện',progress:0,outNo:'',outDate:'',result:'',
+     resultNote:x.coord?('Phối hợp: '+x.coord):''
+   });count++
+ });
+ csave();alert(`Đã duyệt và giao ${count} nhiệm vụ vào Dashboard.`);
+ openCtrl('work')
+}
+</script>
+
+<script>
+const oldRenderCtrlAllV7=renderCtrlAll;
+renderCtrlAll=function(){
+  oldRenderCtrlAllV7();
+  refreshAIDirectiveSelect();
+  renderRecentDirectives();
+  if(typeof buildDirectiveSummary==='function')buildDirectiveSummary();
+}
+window.addEventListener('load',()=>{
+  refreshAIDirectiveSelect();
+  renderRecentDirectives();
+});
+</script>
+
+<script>
+function setLeftActive(btn,title){
+ document.querySelectorAll('.tt-left-item').forEach(x=>x.classList.remove('active'));
+ if(btn)btn.classList.add('active');
+ if(window.ttMobileTitle)ttMobileTitle.textContent=title||btn?.textContent?.trim()||'Trung tâm AI';
+ if(window.innerWidth<=900)document.getElementById('ttLeftMenu')?.classList.remove('mobile-open');
+}
+function hideCenterPages(){
+ ['overview','staff','staffWork','aiwork','libraryTop','sheetPage','monthReportPage'].forEach(id=>{
+   const el=document.getElementById(id);if(el)el.style.display='none';
+ });
+ const main=document.querySelector('.main');if(main)main.style.display='none';
+}
+function showCenterPage(page,btn){
+ const map={overview:'overview',staff:'staff',staffWork:'staffWork',sheet:'weeklyReport',monthreport:'monthlyReport',ai:'ai',library:'lookup'};
+ if(map[page]&&!requirePerm(map[page]))return;
+ hideCenterPages();
+ if(page==='overview'){
+   overview.style.display='block';setL
+
+===== Duyệt & giao việc vào Dashboard =====
+
+p nội dung đã nhập, không tự tạo số liệu, căn cứ, tên người hoặc mốc thời gian. Chỗ thiếu được đánh dấu [CẦN BỔ SUNG].</div>
+  <div class="ctrl-form">
+   <div><label>Ngày họp</label><input id="mhDate" type="date"></div><div><label>Địa điểm</label><input id="mhPlace"></div><div><label>Chủ trì</label><select id="mhChair"></select></div><div><label>Thư ký</label><select id="mhSec"></select></div>
+   <div class="span2"><label>Thành phần dự họp</label><textarea id="mhAttend">Các thành viên trong Ban Xây dựng Đảng</textarea></div><div class="span2"><label>I. NỘI DUNG CUỘC HỌP</label><textarea id="mhAgenda"></textarea></div>
+   <div class="full"><label>1. Đánh giá kết quả thực hiện nhiệm vụ tuần/tháng trước</label><textarea id="mhDiscuss"></textarea></div>
+   <div class="full"><label>2. Triển khai nhiệm vụ tuần/tháng sau và kết luận giao nhiệm vụ</label><textarea id="mhGeneral"></textarea></div>
+   <div><label>Nhiệm vụ giao</label><input id="mhTask"></div><div><label>Người/Bộ phận thực hiện</label><input id="mhOwner"></div><div><label>Kết quả/Sản phẩm phải hoàn thành</label><input id="mhProduct"></div><div><label>Thời hạn</label><input id="mhDue" type="date"></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="addMeetingTask()">＋ Thêm nhiệm vụ vào kết luận</button><button class="btn light" onclick="makeConclusion()">Tạo dự thảo Kết luận</button><button class="btn primary" type="button" onclick="saveMeetingNotice()">💾 Lưu Thông báo kết luận</button><button class="btn light admin-export-only" type="button" onclick="exportCurrentMeetingNoticeWord()">📄 Xuất Word Thông báo</button><button class="btn light" onclick="copyConclusion()">Sao chép</button></div>
+  <div style="overflow:auto"><table class="ctrl-table"><thead><tr><th>STT</th><th>Nhiệm vụ/Văn bản</th><th>Người thực hiện</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th></th></tr></thead><tbody id="meetingTaskRows"></tbody></table></div>
+  <textarea id="mhOutput" class="ctrl-output" readonly></textarea>
+ </div>
+
+ 
+ 
+<div id="meetingNoticePanel" style="margin-top:16px;border-top:1px solid #ead8c7;padding-top:12px">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0;color:#a82619">📚 THÔNG BÁO KẾT LUẬN ĐÃ LƯU</h3><span style="font-size:12px;color:#73584a">Lưu dùng chung để theo dõi, mở lại và xuất Word.</span></div>
+ <div style="overflow:auto;margin-top:8px"><table class="ctrl-table"><thead><tr><th>STT</th><th>Số/Ký hiệu</th><th>Ngày họp</th><th>Nội dung</th><th>Chủ trì</th><th>Số nhiệm vụ</th><th>Thao tác</th></tr></thead><tbody id="meetingNoticeRows"></tbody></table></div>
+</div>
+<div id="c-aiassign" class="ctrl-pane">
+  <div class="ctrl-note"><b>Quy trình thử nghiệm:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc tệp đã lưu → phân tích theo từ khóa nghiệp vụ và lĩnh vực đã phân công → đề xuất người chủ trì/phối hợp, sản phẩm và thời hạn nếu văn bản có nêu. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b></div>
+  <div class="ctrl-form">
+    <div class="span2"><label>Chọn văn bản đã lưu tại mục Văn bản chỉ đạo</label><select id="aiDirectiveSelect" onchange="syncSelectedDirectiveInfo()"></select></div>
+    <div><label>Số/Ký hiệu</label><input id="aiDocNo" readonly></div>
+    <div><label>Ngày văn bản</label><input id="aiDocDate" type="date" readonly></div>
+    <div class="full"><label>Nội dung trích xuất từ văn bản</label><textarea id="aiDocText" placeholder="Chọn văn bản đã lưu, sau đó bấm “Đọc văn bản đã lưu”. Có thể rà soát, chỉnh lại nội dung trích xuất nếu cần."></textarea></div>
+  </div>
+  <div class="ctrl-actions">
+    <button class="btn primary" onclick="readSelectedDirective()">📖 Đọc văn bản đã lưu</button>
+    <button class="btn light" onclick="analyzeAIDocument()">🤖 Phân tích & đề xuất giao việc</button>
+    <button class="btn light" onclick="clearAIAnalysis()">Làm mới</button>
+    <button class="btn light" onclick="openCtrl('directives')">📣 Mở kho Văn bản chỉ đạo</button>
+  </div>
+  <div id="aiReadStatus" class="ctrl-note">Chưa đọc văn bản.</div>
+
+  <div class="ai-assign-summary">
+    <div><b id="aiTaskCount">0</b><span>Nhiệm vụ phát hiện</span></div>
+    <div><b id="aiNeedReview">0</b><span>Cần lãnh đạo xác nhận</span></div>
+    <div><b id="aiHasDeadline">0</b><span>Có thời hạn</span></div>
+  </div>
+
+  <div style="overflow:auto;max-height:520px">
+    <table class="ctrl-table">
+      <thead><tr>
+        <th>Chọn</th><th>Nhiệm vụ/Văn bản</th><th>Lĩnh vực</th><th>Người thực hiện<br><small>AI đề xuất - lãnh đạo chọn</small></th><th>Phối hợp</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th>Căn cứ trong văn bản</th>
+      </tr></thead>
+      <tbody id="aiAssignRows"></tbody>
+    </table>
+  </div>
+  <div class="ctrl-actions">
+    <span class="ai-leader-note">👤 <b>Lãnh đạo có thể đổi người thực hiện</b> tại từng nhiệm vụ trước khi duyệt.</span>
+    <button class="btn primary" onclick="approveAIAssignments()">✅ Duyệt & giao việc vào Dashboard</button>
+  </div>
+  <div class="ctrl-note"><b>Lưu ý:</b> Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.</div>
+ </div>
+
+<div id="c-work" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng việc</b><strong id="wkTotal">0</strong></div><div class="ctrl-kpi"><b>Chưa thực hiện</b><strong id="wkNew">0</strong></div><div class="ctrl-kpi"><b>Đang thực hiện</b><strong id="wkDoing">0</strong></div><div class="ctrl-kpi"><b>Sắp đến hạn ≤3 ngày</b><strong id="wkSoon">0</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="wkLate">0</strong></div><div class="ctrl-kpi"><b>Hoàn thành</b><strong id="wkDone">0</strong></div></div>
+  <div class="ctrl-note"><b>Luồng quản lý:</b> Lãnh đạo giao <b>văn bản/nhiệm vụ</b> → xác định <b>người thực hiện</b> → ghi rõ <b>kết quả/sản phẩm</b> → đặt <b>thời hạn</b> → cán bộ cập nhật <b>tiến độ/kết quả</b>. Hệ thống tự cảnh báo việc sắp đến hạn và quá hạn.</div>
+  <div class="ctrl-form">
+   <div><label>Người thực hiện</label><select id="wOwner"></select></div><div><label>Lĩnh vực phụ trách</label><input id="wArea" readonly></div><div><label>Loại giao việc</label><select id="wType"><option>Văn bản giao xử lý</option><option>Nhiệm vụ lãnh đạo giao</option><option>Văn bản tham mưu ban hành</option><option>Nhiệm vụ thường xuyên</option></select></div><div><label>Mức độ</label><select id="wPriority"><option>Bình thường</option><option>Quan trọng</option><option>Khẩn</option></select></div>
+   <div class="span2"><label>Văn bản/Nhiệm vụ được giao</label><textarea id="wTask"></textarea></div><div class="span2"><label>Kết quả/Sản phẩm phải hoàn thành</label><textarea id="wProduct"></textarea></div>
+   <div><label>Số/Ký hiệu văn bản đầu vào (nếu có)</label><input id="wInNo"></div><div><label>Văn bản giao việc (PDF/Word/Excel)</label><input id="wFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div><label>Ngày giao</label><input id="wStart" type="date"></div><div><label>Thời hạn hoàn thành</label><input id="wDue" type="date"></div>
+   
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveWork()">＋ Lưu nhiệm vụ/văn bản</button><button class="btn light" onclick="enableWorkNotify()">🔔 Bật nhắc việc hằng ngày</button><button class="btn light" onclick="exportWorkCSV()">⬇ Xuất thống kê CSV</button></div>
+  <div class="tt-result-update"><div class="tt-panel-title"><b>✅ Cập nhật kết quả sau khi thực hiện</b><span>Không nhập tại thời điểm giao việc</span></div><div class="ctrl-form"><div><label>Chọn nhiệm vụ</label><select id="wUpdateTask"></select></div><div><label>Trạng thái</label><select id="wUpdateStatus"><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div><div><label>Tiến độ (%)</label><input id="wUpdateProgress" type="number" min="0" max="100"></div><div><label>Số/Ký hiệu văn bản ban hành</label><input id="wUpdateOutNo"></div><div><label>Ngày ban hành</label><input id="wUpdateOutDate" type="date"></div><div><label>File văn bản/sản phẩm đã thực hiện</label><input id="wUpdateFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><small style="display:block;color:#9f1d16;margin-top:4px">Nhiệm vụ ban hành văn bản: bắt buộc tải file khi cập nhật.</small></div><div class="span2"><label>Kết quả thực tế/Sản phẩm đã hoàn thành</label><textarea id="wUpdateResult"></textarea></div><div><label>Ghi chú</label><textarea id="wUpdateNote"></textarea></div></div><button class="btn primary" onclick="updateWorkResult()">Lưu kết quả thực hiện</button></div><div class="ctrl-filter"><b>Lọc:</b><select id="wfPerson" onchange="renderWork()"><option value="">Tất cả thành viên</option></select><select id="wfPeriod" onchange="renderWork()"><option value="all">Tất cả thời gian</option><option value="week">Tuần này</option><option value="month">Tháng này</option></select><select id="wfStatus" onchange="renderWork()"><option value="">Tất cả trạng thái</option><option>Chưa thực hiện</option><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div>
+  <div id="workAlert" class="ctrl-note"></div>
+  <div style="overflow:auto;max-height:430px"><table class="ctrl-table"><thead><tr><th>Người thực hiện</th><th>Lĩnh vực</th><th>Văn bản/Nhiệm vụ</th><th>Kết quả/Sản phẩm</th><th>Hạn</th><th>Tiến độ</th><th>Cảnh báo</th><th>Văn bản ban hành</th><th>File đã thực hiện</th><th></th></tr></thead><tbody id="workRows"></tbody></table></div>
+  <h3 style="color:#9f1d16">Thống kê văn bản ban hành theo công chức</h3><div id="workStats" class="ctrl-note"></div>
+ </div>
+
+ <div id="c-report" class="ctrl-pane">
+  <div class="ctrl-note">Mẫu nhập được xây dựng theo chính bố cục báo cáo bạn gửi. Cùng một cấu trúc áp dụng cho <b>tuần, tháng, quý, năm</b>; mỗi đồng chí chọn đúng mục/lĩnh vực để nhập, sau đó người tổng hợp tạo bản báo cáo chung.</div>
+  <div class="ctrl-form">
+   <div><label>Loại báo cáo</label><select id="rpType"><option>Tuần</option><option>Tháng</option><option>Quý</option><option>Năm</option></select></div><div><label>Kỳ báo cáo</label><input id="rpPeriod" placeholder="VD: Tuần 35/2026"></div><div><label>Người nhập</label><select id="rpPerson"></select></div><div><label>Lĩnh vực</label><input id="rpArea" readonly></div>
+   <div class="full"><label>Mục trong mẫu báo cáo</label><select id="rpSection"></select></div>
+   <div class="full"><label>Nội dung/Kết quả</label><textarea id="rpContent"></textarea></div><div class="span2"><label>Khó khăn, vướng mắc (nếu có)</label><textarea id="rpIssue"></textarea></div><div class="span2"><label>Nhiệm vụ kỳ tiếp theo/đề xuất (nếu có)</label><textarea id="rpNext"></textarea></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveReportItem()">Lưu nội dung lĩnh vực</button><button class="btn light" onclick="buildFullReport()">Tổng hợp theo mẫu</button><button class="btn light" onclick="downloadReport()">⬇ Tải bản tổng hợp</button></div>
+  <textarea id="rpOutput" class="ctrl-output" readonly placeholder="Bản tổng hợp sẽ hiển thị ở đây..."></textarea>
+  <div style="overflow:auto;max-height:330px;margin-top:10px"><table class="ctrl-table"><thead><tr><th>Kỳ</th><th>Người nhập</th><th>Lĩnh vực</th><th>Mục báo cáo</th><th>Nội dung</th><th></th></tr></thead><tbody id="reportRows"></tbody></table></div>
+ </div>
+
+ <div id="c-directives" class="ctrl-pane"><div class="ctrl-note">Theo dõi văn bản chỉ đạo theo <b>lĩnh vực phụ trách</b>, đồng thời lọc theo tuần, tháng, năm.</div><div class="ctrl-form"><div><label>Số/Ký hiệu</label><input id="vdNo"></div><div><label>Ngày ban hành</label><input id="vdDate" type="date"></div><div><label>Cơ quan/đơn vị ban hành</label><input id="vdIssuer"></div><div><label>Lĩnh vực phụ trách</label><select id="vdArea"></select></div><div><label>Tệp văn bản</label><input id="vdFile" type="file" accept=".pdf,.doc,.docx
+
+===== Phân tích & đề xuất giao việc =====
+
+body id="dlBody"></tbody></table>
+</div>
+</div>
+</div>
+
+
+<div class="tt-bottom-red-decor" aria-hidden="true">
+  <div class="tt-bottom-drum"></div>
+  <div class="tt-bottom-lotus">❀</div>
+</div>
+<footer>★ ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM ★ &nbsp; | &nbsp; Trung tâm AI – Ban Xây dựng Đảng xã Thư Lâm</footer>
+
+
+<div id="ctrlModal" class="ctrl-modal"><div class="ctrl-box">
+ <div class="ctrl-head"><h2 id="ctrlTitle">TRUNG TÂM ĐIỀU HÀNH</h2><button class="ctrl-close" onclick="closeCtrl()">Đóng ✕</button></div>
+ <div class="ctrl-tabs">
+  <button class="ctrl-tab" data-c="meeting" onclick="switchCtrl('meeting')">📝 Kết luận họp</button>
+  <button class="ctrl-tab" data-c="aiassign" onclick="switchCtrl('aiassign')">📥🤖 AI giao việc</button>
+  <button class="ctrl-tab" data-c="work" onclick="switchCtrl('work')">📊 Công việc & văn bản</button>
+  <button class="ctrl-tab" data-c="directives" onclick="switchCtrl('directives')">📣 Văn bản chỉ đạo</button><button class="ctrl-tab" data-c="salary" onclick="switchCtrl('salary')">💰 Nâng lương</button>
+ </div>
+
+ <div id="c-meeting" class="ctrl-pane">
+  <div class="ctrl-note"><b>Nguyên tắc:</b> hệ thống chỉ sắp xếp nội dung đã nhập, không tự tạo số liệu, căn cứ, tên người hoặc mốc thời gian. Chỗ thiếu được đánh dấu [CẦN BỔ SUNG].</div>
+  <div class="ctrl-form">
+   <div><label>Ngày họp</label><input id="mhDate" type="date"></div><div><label>Địa điểm</label><input id="mhPlace"></div><div><label>Chủ trì</label><select id="mhChair"></select></div><div><label>Thư ký</label><select id="mhSec"></select></div>
+   <div class="span2"><label>Thành phần dự họp</label><textarea id="mhAttend">Các thành viên trong Ban Xây dựng Đảng</textarea></div><div class="span2"><label>I. NỘI DUNG CUỘC HỌP</label><textarea id="mhAgenda"></textarea></div>
+   <div class="full"><label>1. Đánh giá kết quả thực hiện nhiệm vụ tuần/tháng trước</label><textarea id="mhDiscuss"></textarea></div>
+   <div class="full"><label>2. Triển khai nhiệm vụ tuần/tháng sau và kết luận giao nhiệm vụ</label><textarea id="mhGeneral"></textarea></div>
+   <div><label>Nhiệm vụ giao</label><input id="mhTask"></div><div><label>Người/Bộ phận thực hiện</label><input id="mhOwner"></div><div><label>Kết quả/Sản phẩm phải hoàn thành</label><input id="mhProduct"></div><div><label>Thời hạn</label><input id="mhDue" type="date"></div>
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="addMeetingTask()">＋ Thêm nhiệm vụ vào kết luận</button><button class="btn light" onclick="makeConclusion()">Tạo dự thảo Kết luận</button><button class="btn primary" type="button" onclick="saveMeetingNotice()">💾 Lưu Thông báo kết luận</button><button class="btn light admin-export-only" type="button" onclick="exportCurrentMeetingNoticeWord()">📄 Xuất Word Thông báo</button><button class="btn light" onclick="copyConclusion()">Sao chép</button></div>
+  <div style="overflow:auto"><table class="ctrl-table"><thead><tr><th>STT</th><th>Nhiệm vụ/Văn bản</th><th>Người thực hiện</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th></th></tr></thead><tbody id="meetingTaskRows"></tbody></table></div>
+  <textarea id="mhOutput" class="ctrl-output" readonly></textarea>
+ </div>
+
+ 
+ 
+<div id="meetingNoticePanel" style="margin-top:16px;border-top:1px solid #ead8c7;padding-top:12px">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0;color:#a82619">📚 THÔNG BÁO KẾT LUẬN ĐÃ LƯU</h3><span style="font-size:12px;color:#73584a">Lưu dùng chung để theo dõi, mở lại và xuất Word.</span></div>
+ <div style="overflow:auto;margin-top:8px"><table class="ctrl-table"><thead><tr><th>STT</th><th>Số/Ký hiệu</th><th>Ngày họp</th><th>Nội dung</th><th>Chủ trì</th><th>Số nhiệm vụ</th><th>Thao tác</th></tr></thead><tbody id="meetingNoticeRows"></tbody></table></div>
+</div>
+<div id="c-aiassign" class="ctrl-pane">
+  <div class="ctrl-note"><b>Quy trình thử nghiệm:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc tệp đã lưu → phân tích theo từ khóa nghiệp vụ và lĩnh vực đã phân công → đề xuất người chủ trì/phối hợp, sản phẩm và thời hạn nếu văn bản có nêu. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b></div>
+  <div class="ctrl-form">
+    <div class="span2"><label>Chọn văn bản đã lưu tại mục Văn bản chỉ đạo</label><select id="aiDirectiveSelect" onchange="syncSelectedDirectiveInfo()"></select></div>
+    <div><label>Số/Ký hiệu</label><input id="aiDocNo" readonly></div>
+    <div><label>Ngày văn bản</label><input id="aiDocDate" type="date" readonly></div>
+    <div class="full"><label>Nội dung trích xuất từ văn bản</label><textarea id="aiDocText" placeholder="Chọn văn bản đã lưu, sau đó bấm “Đọc văn bản đã lưu”. Có thể rà soát, chỉnh lại nội dung trích xuất nếu cần."></textarea></div>
+  </div>
+  <div class="ctrl-actions">
+    <button class="btn primary" onclick="readSelectedDirective()">📖 Đọc văn bản đã lưu</button>
+    <button class="btn light" onclick="analyzeAIDocument()">🤖 Phân tích & đề xuất giao việc</button>
+    <button class="btn light" onclick="clearAIAnalysis()">Làm mới</button>
+    <button class="btn light" onclick="openCtrl('directives')">📣 Mở kho Văn bản chỉ đạo</button>
+  </div>
+  <div id="aiReadStatus" class="ctrl-note">Chưa đọc văn bản.</div>
+
+  <div class="ai-assign-summary">
+    <div><b id="aiTaskCount">0</b><span>Nhiệm vụ phát hiện</span></div>
+    <div><b id="aiNeedReview">0</b><span>Cần lãnh đạo xác nhận</span></div>
+    <div><b id="aiHasDeadline">0</b><span>Có thời hạn</span></div>
+  </div>
+
+  <div style="overflow:auto;max-height:520px">
+    <table class="ctrl-table">
+      <thead><tr>
+        <th>Chọn</th><th>Nhiệm vụ/Văn bản</th><th>Lĩnh vực</th><th>Người thực hiện<br><small>AI đề xuất - lãnh đạo chọn</small></th><th>Phối hợp</th><th>Kết quả/Sản phẩm</th><th>Thời hạn</th><th>Căn cứ trong văn bản</th>
+      </tr></thead>
+      <tbody id="aiAssignRows"></tbody>
+    </table>
+  </div>
+  <div class="ctrl-actions">
+    <span class="ai-leader-note">👤 <b>Lãnh đạo có thể đổi người thực hiện</b> tại từng nhiệm vụ trước khi duyệt.</span>
+    <button class="btn primary" onclick="approveAIAssignments()">✅ Duyệt & giao việc vào Dashboard</button>
+  </div>
+  <div class="ctrl-note"><b>Lưu ý:</b> Hệ thống đọc văn bản trực tiếp trên trình duyệt. Văn bản scan được nhận dạng OCR tiếng Việt; kết quả phân tích là đề xuất để lãnh đạo kiểm tra, chỉnh sửa và duyệt trước khi giao việc.</div>
+ </div>
+
+<div id="c-work" class="ctrl-pane">
+  <div class="ctrl-kpis"><div class="ctrl-kpi"><b>Tổng việc</b><strong id="wkTotal">0</strong></div><div class="ctrl-kpi"><b>Chưa thực hiện</b><strong id="wkNew">0</strong></div><div class="ctrl-kpi"><b>Đang thực hiện</b><strong id="wkDoing">0</strong></div><div class="ctrl-kpi"><b>Sắp đến hạn ≤3 ngày</b><strong id="wkSoon">0</strong></div><div class="ctrl-kpi"><b>Quá hạn</b><strong id="wkLate">0</strong></div><div class="ctrl-kpi"><b>Hoàn thành</b><strong id="wkDone">0</strong></div></div>
+  <div class="ctrl-note"><b>Luồng quản lý:</b> Lãnh đạo giao <b>văn bản/nhiệm vụ</b> → xác định <b>người thực hiện</b> → ghi rõ <b>kết quả/sản phẩm</b> → đặt <b>thời hạn</b> → cán bộ cập nhật <b>tiến độ/kết quả</b>. Hệ thống tự cảnh báo việc sắp đến hạn và quá hạn.</div>
+  <div class="ctrl-form">
+   <div><label>Người thực hiện</label><select id="wOwner"></select></div><div><label>Lĩnh vực phụ trách</label><input id="wArea" readonly></div><div><label>Loại giao việc</label><select id="wType"><option>Văn bản giao xử lý</option><option>Nhiệm vụ lãnh đạo giao</option><option>Văn bản tham mưu ban hành</option><option>Nhiệm vụ thường xuyên</option></select></div><div><label>Mức độ</label><select id="wPriority"><option>Bình thường</option><option>Quan trọng</option><option>Khẩn</option></select></div>
+   <div class="span2"><label>Văn bản/Nhiệm vụ được giao</label><textarea id="wTask"></textarea></div><div class="span2"><label>Kết quả/Sản phẩm phải hoàn thành</label><textarea id="wProduct"></textarea></div>
+   <div><label>Số/Ký hiệu văn bản đầu vào (nếu có)</label><input id="wInNo"></div><div><label>Văn bản giao việc (PDF/Word/Excel)</label><input id="wFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"></div><div><label>Ngày giao</label><input id="wStart" type="date"></div><div><label>Thời hạn hoàn thành</label><input id="wDue" type="date"></div>
+   
+  </div>
+  <div class="ctrl-actions"><button class="btn primary" onclick="saveWork()">＋ Lưu nhiệm vụ/văn bản</button><button class="btn light" onclick="enableWorkNotify()">🔔 Bật nhắc việc hằng ngày</button><button class="btn light" onclick="exportWorkCSV()">⬇ Xuất thống kê CSV</button></div>
+  <div class="tt-result-update"><div class="tt-panel-title"><b>✅ Cập nhật kết quả sau khi thực hiện</b><span>Không nhập tại thời điểm giao việc</span></div><div class="ctrl-form"><div><label>Chọn nhiệm vụ</label><select id="wUpdateTask"></select></div><div><label>Trạng thái</label><select id="wUpdateStatus"><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div><div><label>Tiến độ (%)</label><input id="wUpdateProgress" type="number" min="0" max="100"></div><div><label>Số/Ký hiệu văn bản ban hành</label><input id="wUpdateOutNo"></div><div><label>Ngày ban hành</label><input id="wUpdateOutDate" type="date"></div><div><label>File văn bản/sản phẩm đã thực hiện</label><input id="wUpdateFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><small style="display:block;color:#9f1d16;margin-top:4px">Nhiệm vụ ban hành văn bản: bắt buộc tải file khi cập nhật.</small></div><div class="span2"><label>Kết quả thực tế/Sản phẩm đã hoàn thành</label><textarea id="wUpdateResult"></textarea></div><div><label>Ghi chú</label><textarea id="wUpdateNote"></textarea></div></div><button class="btn primary" onclick="updateWorkResult()">Lưu kết quả thực hiện</button></div><div class="ctrl-filter"><b>Lọc:</b><select id="wfPerson" onchange="renderWork()"><option value="">Tất cả thành viên</option></select><select id="wfPeriod" onchange="renderWork()"><option value="all">Tất cả thời gian</option><option value="week">Tuần này</option><option value="month">Tháng này</option></select><select id="wfStatus" onchange="renderWork()"><option value="">Tất cả trạng thái</option><option>Chưa thực hiện</option><option>Đang thực hiện</option><option>Chờ phối hợp</option><option>Đã hoàn thành</option></select></div>
+  <div id="workAlert" class="ctrl-note"></div>
+  <div style="overflow:auto;max-height:430px"><table class="ctrl-table"><thead><tr><th>Người thực hiện</th><th>Lĩnh vực</th><th>Văn bản/Nhiệm vụ</th><th>Kết quả/Sản phẩm</th><th>Hạn</th><th>Tiến độ</th><th>Cảnh báo</th><th>Văn bản ban hành</th><th>File đã thực hiện</th><th></th></tr></thead><tbody id="workRows"></tbody></table></div>
+  <h3 style="color:#9f1d16">Thống kê văn bản ban hành theo công chức</h3><div id="workStats" class="ctrl-note"></div>
+ </div>
+
+ <div id="c-report" class="ctrl-pane">
+  <div class="ctrl-note">Mẫu nhập được xây dựng theo chính bố cục báo cáo bạn gửi. Cùng một cấu trúc áp dụng cho <b>tuần, tháng, quý, năm</b>; mỗi đồng chí chọn đúng mục/lĩnh vực để nhập, sau đó người tổng hợp tạo bản báo cáo chung.</div>
+  <div class="ctrl-form">
+   <div><label>Loại báo cáo</label><select id="rpType"><option>Tuần</option><option>Tháng</option><option>Quý</option><option>Năm</option></select></div><div><label>Kỳ báo cáo</label><input id="rpPeriod" placeholder="VD: Tuần 35/2026"></div><div><label>Người nhập</label><select id="rpPerson"></select></div><div><label>Lĩnh vực</label><input id="rpArea" readonly></div>
+   <div class="full"><label>Mục trong mẫu báo cáo</label><select id="rpSection"></select></div>
+   <div class="full"><label>Nội dung/Kết quả</label><textarea id="rpContent"></textarea></div><div class="span2"><label>Khó khăn, vướng mắc (nếu có)</label><textarea id="rpIssue"></textarea></div><div class="span2"><label>Nhiệm vụ kỳ tiếp theo/đề xuất (nếu có)</label><textarea id="rpNext"></textarea></div>
+  </div>
+  <div class="ctrl-actions"><
+y{const r=await fetch(url);if(r.ok)return await r.blob()}catch(e){}}
+ return null
+}
+async function v839OCRVisibleSavedDoc(){
+ const box=[...document.querySelectorAll('textarea')].find(x=>/Chọn văn bản đã lưu/i.test(x.placeholder||''))||document.querySelector('#aiDocText,#directiveExtractedText,#savedDocText');
+ if(!box||!extractedTextTooShort(box.value))return;
+ const {d}=await v839GetSelectedDirective();const blob=await v839GetDirectiveBlob(d);if(!blob)return;
+ const status=[...document.querySelectorAll('div,span,p')].find(e=>/^Đã đọc:/.test((e.textContent||'').trim()));
+ if(status)status.textContent='PDF scan: đang nhận dạng chữ tiếng Việt...';
+ const text=await ocrScannedPdfBlob(blob,status);if(text&&text.trim().length>=50){box.value=text.trim();box.dispatchEvent(new Event('input',{bubbles:true}));if(status)status.textContent=`Đã OCR PDF scan • ${text.trim().length.toLocaleString('vi-VN')} ký tự.`;return true}
+ if(status)status.textContent='PDF scan chưa nhận dạng đủ nội dung.';return false
+}
+document.addEventListener('click',async e=>{
+ const b=e.target.closest('button');if(!b||!/Đọc văn bản đã lưu/i.test(b.textContent||''))return;
+ setTimeout(async()=>{try{await v839OCRVisibleSavedDoc()}catch(err){console.error('V839 OCR',err);alert('Chưa đọc được PDF scan: '+err.message)}},900)
+},true);
+
+</script>
+<script>
+// V8.42: free production OCR fallback for saved directive PDFs
+(function(){
+ const norm=t=>(t||'').replace(/\s+/g,' ').trim();
+ function pickTextArea(){return [...document.querySelectorAll('textarea')].find(x=>/Chọn văn bản đã lưu|Nội dung trích xuất/i.test(x.placeholder||'') || /trích xuất/i.test((x.previousElementSibling?.innerText||''))) || document.querySelector('#meetingDirectiveText,#directiveExtract,#directiveText');}
+ function selected(){const sels=[...document.querySelectorAll('select')];const el=sels.find(x=>/09-CT\/TU|Văn bản chỉ đạo/i.test(x.options?.[x.selectedIndex]?.text||''))||sels.find(x=>/văn bản/i.test(x.previousElementSibling?.innerText||'')); const v=el?.value; let d=null; try{d=(CTRL?.directives||[]).find(x=>String(x.id)==String(v))}catch(e){}; return d||{id:v};}
+ async function blobFor(d){const keys=[d?.id,d?.fileKey,d?.file_key,d?.object_key,d?.objectKey].filter(Boolean);for(const k of keys){try{if(typeof getDirectiveFileBlob==='function'){const z=await getDirectiveFileBlob(String(k));if(z instanceof Blob)return z;if(z?.blob instanceof Blob)return z.blob}}catch(e){console.warn('cloud blob',e)}}return null;}
+ async function ensureScript(src,test){if(test())return;await new Promise((ok,bad)=>{const q=document.createElement('script');q.src=src;q.onload=ok;q.onerror=bad;document.head.appendChild(q)});if(!test())throw new Error('Không tải được thư viện OCR');}
+ async function readPdf(blob,status){await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const ab=await blob.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:ab}).promise;let native='';for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const c=await p.getTextContent();native+='\n'+c.items.map(x=>x.str).join(' ')}if(norm(native).length>=80)return native.trim();
+ await ensureScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);status.textContent='PDF scan: đang khởi tạo OCR tiếng Việt...';const worker=await Tesseract.createWorker(['vie','eng'],1,{logger:m=>{if(m.status==='recognizing text')status.textContent='Đang OCR: '+Math.round((m.progress||0)*100)+'%'}});let out='';try{for(let i=1;i<=pdf.numPages;i++){status.textContent=`Đang OCR trang ${i}/${pdf.numPages}...`;const p=await pdf.getPage(i);const vp=p.getViewport({scale:2.25});const cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);await p.render({canvasContext:cv.getContext('2d',{willReadFrequently:true}),viewport:vp}).promise;const r=await worker.recognize(cv);out+='\n\n--- Trang '+i+' ---\n'+(r.data?.text||'')}}finally{await worker.terminate()}return out.trim();}
+ async function run(){const ta=pickTextArea();if(!ta)throw new Error('Không tìm thấy ô Nội dung trích xuất');const status=[...document.querySelectorAll('div,p,span')].find(x=>/^Đã đọc:|^PDF scan:|^Đang OCR/i.test(x.textContent.trim()))||ta.parentElement?.nextElementSibling||document.body;const d=selected();status.textContent='Đang lấy file PDF đã lưu...';const blob=await blobFor(d);if(!blob)throw new Error('Không lấy được file PDF từ kho lưu trữ.');const text=await readPdf(blob,status);if(norm(text).length<40)throw new Error('OCR chưa nhận đủ nội dung. Hãy kiểm tra chất lượng bản scan.');ta.value=text;ta.dispatchEvent(new Event('input',{bubbles:true}));ta.dispatchEvent(new Event('change',{bubbles:true}));window.__thuLamDirectiveExtract=text;status.textContent='Đã đọc đầy đủ: '+text.length.toLocaleString('vi-VN')+' ký tự. Có thể bấm “Phân tích & đề xuất giao việc”.';}
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!/^\s*📖?\s*Đọc văn bản đã lưu/i.test(b.textContent||''))return;e.preventDefault();e.stopImmediatePropagation();b.disabled=true;run().catch(err=>{console.error(err);alert('Không đọc được văn bản: '+err.message)}).finally(()=>b.disabled=false)},true);
+})();
+</script>
+
+
+
+
+
+
+
+<script id="v849-party-flag-runtime">
+(()=>{
+ const SRC='assets/co-dang-chuan.png?v=849';
+ function apply(root=document){
+   const imgs=[];
+   if(root.matches?.('img')) imgs.push(root);
+   root.querySelectorAll?.('img').forEach(i=>imgs.push(i));
+   imgs.forEach(img=>{
+     const alt=(img.getAttribute('alt')||'').toLowerCase();
+     const src=(img.getAttribute('src')||'').toLowerCase();
+     const cls=(img.className||'').toString().toLowerCase();
+     if(!(alt.includes('cờ đảng')||alt.includes('co dang')||src.includes('co-dang-chuan')||cls.includes('party-flag'))) return;
+     img.src=SRC;
+     img.style.setProperty('display','block','important');
+     img.style.setProperty('width','100%','important');
+     img.style.setProperty('height','100%','important');
+     img.style.setProperty('object-fit','contain','important');
+     img.style.setProperty('object-position','center center','important');
+   });
+   root.querySelectorAll?.('.party-emblem,.party-logo,.dang-emblem,.dang-logo').forEach(el=>{
+     el.style.setProperty('background-image',`url(${SRC})`,'important');
+     el.style.setProperty('background-size','contain','important');
+     el.style.setProperty('background-position','center center','important');
+     el.style.setProperty('background-repeat','no-repeat','important');
+     el.style.setProperty('background-color','#df291f','important');
+   });
+ }
+ const go=()=>{apply(document);setTimeout(()=>apply(document),300);setTimeout(()=>apply(document),1200)};
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
+ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)apply(n)}))).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+<script id="v850-ai-assignment-refine">
+(()=>{
+ const clean=t=>String(t||'').replace(/\s+/g,' ').trim();
+ const low=t=>clean(t).toLowerCase();
+ function area(text){const t=low(text);if(/cán bộ|biên chế|đánh giá|xếp loại|bổ nhiệm|quy hoạch|điều động|đào tạo|bồi dưỡng|chính sách cán bộ/.test(t))return 'Tổ chức, cán bộ';if(/đảng viên|chi bộ|tổ chức đảng|kết nạp|chuyển chính thức|sinh hoạt đảng|huy hiệu đảng/.test(t))return 'Đảng, đảng viên';if(/tuyên giáo|tuyên truyền|dư luận|báo chí|văn hóa|tư tưởng|chỉ thị 24/.test(t))return 'Tuyên giáo';return 'Công tác tổng hợp';}
+ function task(text){const t=clean(text);let m=t.match(/(?:giao|yêu cầu|đề nghị)[^.;:]{0,100}(?:ban xây dựng đảng|đảng ủy|cấp ủy)?[^.;]{8,220}/i);if(m)return 'Tham mưu triển khai thực hiện '+clean(m[0]).replace(/^(giao|yêu cầu|đề nghị)\s*/i,'').replace(/[.;,]+$/,'');let title=t.match(/(?:kế hoạch|chỉ thị|quy định|hướng dẫn|công văn|thông báo)\s+(?:số\s*)?[^.;\n]{3,90}/i);return title?'Tham mưu triển khai thực hiện '+clean(title[0]):'Tham mưu triển khai thực hiện nội dung văn bản chỉ đạo';}
+ function product(text){const t=low(text);if(/báo cáo|tổng hợp kết quả/.test(t))return 'Tham mưu văn bản triển khai thực hiện và báo cáo kết quả theo yêu cầu của văn bản';if(/kế hoạch/.test(t))return 'Tham mưu văn bản triển khai, tổ chức thực hiện Kế hoạch';if(/chỉ thị/.test(t))return 'Tham mưu văn bản triển khai, tổ chức thực hiện Chỉ thị';return 'Tham mưu văn bản triển khai, tổ chức thực hiện theo yêu cầu của văn bản';}
+ function table(){return [...document.querySelectorAll('table')].find(x=>{const h=low(x.tHead?.innerText||x.querySelector('thead')?.innerText||'');return h.includes('nhiệm vụ/văn bản')&&h.includes('người thực hiện')&&h.includes('kết quả/sản phẩm')});}
+ function source(){const ta=[...document.querySelectorAll('textarea')].find(x=>/nội dung trích xuất|trích xuất/i.test((x.placeholder||'')+' '+(x.previousElementSibling?.innerText||'')));return clean(ta?.value||window.__thuLamDirectiveExtract||'');}
+ function setControl(cell,val,blank=false){const e=cell?.querySelector('textarea,input,select');if(!e)return false;if(e.tagName==='SELECT'){if(blank){e.value='';e.selectedIndex=0;}else{const o=[...e.options].find(o=>low(o.textContent)===low(val)||low(o.textContent).includes(low(val)));if(o)e.value=o.value;else return false}}else e.value=blank?'':val;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true;}
+ function refine(){const tb=table();if(!tb)return false;const rows=[...tb.querySelectorAll('tbody tr')];if(!rows.length)return false;const text=source()||clean(rows.map(r=>r.cells?.[1]?.innerText||'').join(' '));const first=rows[0];rows.slice(1).forEach(r=>r.remove());const c=first.cells;if(!c||c.length<7)return false;setControl(c[1],task(text));if(!c[1].querySelector('textarea,input')){c[1].contentEditable='true';c[1].innerText=task(text)}setControl(c[2],area(text));setControl(c[3],'',true);setControl(c[4],'',true);setControl(c[5],product(text));const headers=[...tb.querySelectorAll('thead th')];headers.forEach(h=>{if(/nhiệm vụ\/văn bản/i.test(h.innerText))h.innerText='Nhiệm vụ cụ thể cần thực hiện';if(/kết quả\/sản phẩm/i.test(h.innerText))h.innerText='Sản phẩm cần hoàn thành'});return true;}
+ let timer=null;const obs=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(refine,120)});const start=()=>{obs.observe(document.body,{childList:true,subtree:true});refine()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&/phân tích.*đề xuất giao việc/i.test(b.innerText||''))setTimeout(refine,250)},true);
+})();
+</script>
+</body>
+</html>
