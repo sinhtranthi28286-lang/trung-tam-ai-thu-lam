@@ -1,0 +1,25 @@
+name: Apply V8.50 AI assignment refinement
+on:
+  push:
+    paths:
+      - 'tools/patch_v850_assignment.py'
+      - '.github/workflows/apply-v850.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Patch assignment analysis
+        run: python tools/patch_v850_assignment.py
+      - name: Commit generated app
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html v825/part*.txt
+          git diff --cached --quiet || git commit -m 'V8.50 refine AI assignment to one actionable task'
+          git push
