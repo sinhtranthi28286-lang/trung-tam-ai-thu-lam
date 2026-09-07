@@ -11,6 +11,7 @@
       .tt-smart-tools{margin:16px 0 4px;padding:18px;border:1px solid #ead1bf;border-radius:16px;background:linear-gradient(135deg,#fffaf5,#fff);box-shadow:0 7px 20px rgba(105,24,15,.08)}
       .tt-smart-head{margin-bottom:12px}.tt-smart-head h3{margin:3px 0 0;color:#8f1d15;font-size:21px}.tt-smart-head p{margin:4px 0 0;color:#6b625e;font-size:13px}
       .tt-smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.tt-smart-card{border:1px solid #ead3c3;border-radius:14px;padding:16px;background:#fff;cursor:pointer;transition:.2s;display:flex;gap:13px;align-items:flex-start}.tt-smart-card:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(120,30,20,.12);border-color:#c64232}.tt-smart-icon{width:48px;height:48px;min-width:48px;border-radius:13px;background:#a82017;color:#ffe56c;display:flex;align-items:center;justify-content:center;font-size:24px}.tt-smart-card b{display:block;color:#8f1d15;font-size:16px;margin-bottom:6px}.tt-smart-card p{margin:0;color:#615956;line-height:1.45;font-size:13px}.tt-smart-card span{display:inline-block;margin-top:8px;color:#a82017;font-weight:700;font-size:13px}
+      .tt-reserve-area{border:2px dashed #a82017!important;background:linear-gradient(135deg,#fff8e8,#fff)!important}.tt-reserve-area b{color:#8f1d15!important}.tt-reserve-area small{color:#765f54!important}
       .tt-tool-overlay{position:fixed;inset:0;background:rgba(35,8,6,.68);z-index:2147482500;display:none;align-items:center;justify-content:center;padding:18px}.tt-tool-modal{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;border:2px solid #d8aa39;box-shadow:0 24px 70px rgba(0,0,0,.32);color:#302724}.tt-tool-title{padding:16px 18px;background:linear-gradient(135deg,#981b15,#c42b20);color:#fff;display:flex;justify-content:space-between;align-items:center}.tt-tool-title h3{margin:0;font-size:20px}.tt-tool-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:8px;width:34px;height:34px;font-size:20px;cursor:pointer}.tt-tool-body{padding:18px}.tt-tool-note{background:#fff7e8;border-left:4px solid #d6a325;padding:10px 12px;margin-bottom:14px;border-radius:7px;font-size:13px;line-height:1.45}.tt-tool-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tt-tool-form label{display:block;font-weight:700;color:#6f1a15;font-size:13px}.tt-tool-form input,.tt-tool-form select,.tt-tool-form textarea{box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #d9c8bd;border-radius:8px;font:14px Segoe UI,Arial;background:#fff}.tt-tool-form .full{grid-column:1/-1}.tt-tool-files{font-size:12px;color:#6d625d;margin-top:5px}.tt-tool-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}.tt-tool-actions button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.tt-tool-secondary{background:#f0e5dd;color:#7c2018}.tt-tool-primary{background:#a82017;color:#fff}
       @media(max-width:720px){.tt-smart-grid,.tt-tool-form{grid-template-columns:1fr}.tt-tool-form .full{grid-column:auto}}
     `;
@@ -34,6 +35,23 @@
     panel.querySelector('[data-tool="image"]').onclick = () => openTool('image');
   }
 
+  function addReserveArea() {
+    const areas = $('areas');
+    if (!areas || areas.querySelector('.tt-reserve-area')) return;
+    const card = document.createElement('div');
+    card.className = 'area tt-reserve-area';
+    card.innerHTML = '<b>🧭 Lĩnh vực dự phòng – Tham mưu theo tác vụ</b><small>Dùng cho nhiệm vụ phát sinh theo yêu cầu lãnh đạo</small>';
+    card.onclick = () => openTool('reserve');
+    areas.appendChild(card);
+  }
+
+  function watchReserveArea() {
+    const areas = $('areas');
+    if (!areas) return;
+    addReserveArea();
+    new MutationObserver(addReserveArea).observe(areas, { childList: true });
+  }
+
   function addModal() {
     if ($('ttToolOverlay')) return;
     const overlay = document.createElement('div');
@@ -53,7 +71,21 @@
   function openTool(type) {
     addModal();
     $('ttToolOverlay').style.display = 'flex';
-    if (type === 'merge') {
+    if (type === 'reserve') {
+      $('ttToolTitle').textContent = '🧭 Lĩnh vực dự phòng – Tham mưu theo tác vụ';
+      $('ttToolBody').innerHTML = `
+        <div class="tt-tool-note"><b>Khi nào sử dụng:</b> Dùng cho công việc phát sinh chưa thuộc các lĩnh vực hoặc công việc mẫu hiện có. Hãy nhập yêu cầu cụ thể của lãnh đạo; hệ thống sẽ tạo câu lệnh để AI phân tích nhiệm vụ, đề xuất quy trình và chỉ rõ thông tin cần bổ sung.</div>
+        <div class="tt-tool-form">
+          <label class="full">Tác vụ cụ thể cần thực hiện<input id="ttReserveTask" placeholder="Ví dụ: Rà soát hồ sơ và tham mưu văn bản trả lời..." /></label>
+          <label class="full">Nội dung chỉ đạo hoặc yêu cầu của lãnh đạo<textarea id="ttReserveDirection" rows="4" placeholder="Ghi đúng nội dung lãnh đạo giao, mục tiêu và yêu cầu cần đạt..."></textarea></label>
+          <label>Sản phẩm dự kiến<select id="ttReserveOutput"><option>Đề xuất quy trình thực hiện</option><option>Công văn</option><option>Kế hoạch</option><option>Báo cáo</option><option>Tờ trình</option><option>Quyết định</option><option>Danh sách hoặc biểu tổng hợp</option><option>Chưa xác định – đề nghị AI gợi ý</option></select></label>
+          <label>Thời hạn/đối tượng thực hiện<input id="ttReserveDeadline" placeholder="Có thể để trống nếu chưa được giao" /></label>
+          <label class="full">Tài liệu liên quan (không bắt buộc)<input id="ttReserveFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"><div id="ttReserveNames" class="tt-tool-files">Chưa chọn tệp.</div></label>
+          <label class="full">Thông tin khác cần lưu ý (nếu có)<textarea id="ttReserveNote" rows="3" placeholder="Ví dụ: thẩm quyền ký, đơn vị phối hợp, mẫu văn bản phải sử dụng..."></textarea></label>
+        </div><div class="tt-tool-actions"><button id="ttCancel" class="tt-tool-secondary">Đóng</button><button id="ttRun" class="tt-tool-primary">📋 Tạo câu lệnh & mở ChatGPT</button></div>`;
+      $('ttReserveFiles').onchange = (e) => fileNames(e.target, 'ttReserveNames');
+      $('ttRun').onclick = runReserve;
+    } else if (type === 'merge') {
       $('ttToolTitle').textContent = '📚 Tham mưu hợp nhất nhiều văn bản';
       $('ttToolBody').innerHTML = `
         <div class="tt-tool-note"><b>Cách sử dụng:</b> Chọn các văn bản cùng một lĩnh vực. Trung tâm sẽ chuẩn bị câu lệnh chuẩn; sau khi ChatGPT mở, tải đúng các tệp đã chọn rồi dán câu lệnh. AI chỉ dự thảo, cán bộ kiểm tra trước khi trình ký.</div>
@@ -116,6 +148,39 @@ NHIỆM VỤ:
 AI chỉ hỗ trợ tham mưu; cán bộ chịu trách nhiệm kiểm tra và quyết định văn bản chính thức.`);
   }
 
+  function runReserve() {
+    const task = $('ttReserveTask').value.trim();
+    const direction = $('ttReserveDirection').value.trim();
+    if (!task) return alert('Hãy nhập tác vụ cụ thể cần thực hiện.');
+    if (!direction) return alert('Hãy nhập nội dung chỉ đạo hoặc yêu cầu của lãnh đạo.');
+    const output = $('ttReserveOutput').value;
+    const deadline = $('ttReserveDeadline').value.trim();
+    const note = $('ttReserveNote').value.trim();
+    const files = Array.from($('ttReserveFiles').files || []);
+    const names = files.length ? files.map((f, i) => `${i + 1}. ${f.name}`).join('\n') : 'Không có tài liệu đính kèm.';
+    copyAndOpen(`Bạn đang hỗ trợ cán bộ Ban Xây dựng Đảng xã Thư Lâm xử lý một nhiệm vụ phát sinh theo chỉ đạo của lãnh đạo.
+
+TÁC VỤ CỤ THỂ: ${task}
+CHỈ ĐẠO/YÊU CẦU CỦA LÃNH ĐẠO: ${direction}
+SẢN PHẨM DỰ KIẾN: ${output}
+${deadline ? `THỜI HẠN/ĐỐI TƯỢNG: ${deadline}\n` : ''}${note ? `LƯU Ý KHÁC: ${note}\n` : ''}TÀI LIỆU LIÊN QUAN:
+${names}
+
+HÃY THỰC HIỆN THEO TRÌNH TỰ:
+1. Tóm tắt chính xác yêu cầu và xác định mục tiêu cuối cùng của tác vụ.
+2. Xác định tác vụ thuộc hoặc gần với lĩnh vực nghiệp vụ nào; nêu cơ quan, người chủ trì/phối hợp nếu thông tin nguồn đã có.
+3. Đề xuất các bước thực hiện theo thứ tự, hồ sơ/tài liệu cần chuẩn bị và sản phẩm của từng bước.
+4. Liệt kê riêng những thông tin còn thiếu, điểm chưa rõ hoặc nội dung cần xin ý kiến lãnh đạo trước khi làm tiếp.
+5. Gợi ý câu hỏi ngắn gọn để cán bộ bổ sung thông tin cần thiết. Không hỏi lại những nội dung đã có.
+6. Khi đủ thông tin, đề xuất cấu trúc hoặc soạn dự thảo sản phẩm phù hợp; trước khi soạn phải để cán bộ xác nhận phương án.
+
+NGUYÊN TẮC:
+- Chỉ sử dụng nội dung tôi cung cấp và tài liệu tải lên; không tự tạo căn cứ, số liệu, tên người, chức vụ, thời hạn hoặc kết quả.
+- Nội dung thiếu ghi [CẦN BỔ SUNG]; nội dung mâu thuẫn ghi [CẦN KIỂM TRA].
+- Phân biệt rõ: thông tin từ tài liệu, nhận định của AI và đề xuất để cán bộ lựa chọn.
+- AI chỉ hỗ trợ tham mưu; cán bộ kiểm tra trước khi sử dụng hoặc trình lãnh đạo.`);
+  }
+
   function runImage() {
     const file = $('ttImgFile').files && $('ttImgFile').files[0];
     if (!file) return alert('Hãy chọn văn bản nguồn.');
@@ -140,6 +205,6 @@ ${note ? `- Nội dung cần nhấn mạnh: ${note}.\n` : ''}
 Sau khi tôi duyệt phần chữ, hãy dùng công cụ tạo ảnh để xuất hình hoàn chỉnh, không watermark.`);
   }
 
-  function init() { addStyles(); addPanel(); addModal(); }
+  function init() { addStyles(); addPanel(); addModal(); watchReserveArea(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
