@@ -205,6 +205,115 @@ ${note ? `- Nội dung cần nhấn mạnh: ${note}.\n` : ''}
 Sau khi tôi duyệt phần chữ, hãy dùng công cụ tạo ảnh để xuất hình hoàn chỉnh, không watermark.`);
   }
 
-  function init() { addStyles(); addPanel(); addModal(); watchReserveArea(); }
+  function normalizedTaskText(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function detailedProductForCommune(task) {
+    const t = normalizedTaskText(task);
+    const explicit = (label, detail) => `${label}: ${detail}`;
+    if (/(báo cáo).*(rà soát)|(rà soát).*(báo cáo)/i.test(t))
+      return explicit('Báo cáo kết quả rà soát', 'kèm bảng tổng hợp/danh sách hoặc phụ lục theo đúng yêu cầu của văn bản nguồn (nếu có)');
+    if (/rà soát|thống kê|tổng hợp danh sách/i.test(t))
+      return '[ĐỀ XUẤT ĐỂ LÃNH ĐẠO DUYỆT] Bảng tổng hợp hoặc danh sách kết quả rà soát; kèm báo cáo/công văn gửi cơ quan yêu cầu nếu văn bản nguồn yêu cầu báo cáo';
+    if (/xây dựng|ban hành/.test(t) && /kế hoạch/.test(t))
+      return explicit('Dự thảo Kế hoạch của cấp xã', 'nêu mục đích, nhiệm vụ, phân công đơn vị chủ trì/phối hợp, tiến độ và chế độ báo cáo theo văn bản nguồn');
+    if (/kế hoạch/.test(t))
+      return explicit('Kế hoạch triển khai của cấp xã', 'kèm phân công nhiệm vụ và tiến độ thực hiện theo nội dung văn bản nguồn');
+    if (/công văn/.test(t) && /triển khai|thực hiện|hướng dẫn/.test(t))
+      return explicit('Dự thảo Công văn triển khai', 'xác định rõ đối tượng thực hiện, nhiệm vụ, sản phẩm và thời hạn theo văn bản nguồn');
+    if (/báo cáo/.test(t))
+      return explicit('Báo cáo của cấp xã', 'kèm biểu mẫu/phụ lục/danh sách theo văn bản nguồn; nêu kết quả, tồn tại và kiến nghị nếu được yêu cầu');
+    if (/đăng ký|đề xuất danh sách/.test(t))
+      return explicit('Công văn đăng ký/đề xuất', 'kèm danh sách và phụ lục theo mẫu của cơ quan yêu cầu (nếu có)');
+    if (/xin ý kiến|lấy ý kiến|góp ý/.test(t))
+      return explicit('Văn bản tham gia ý kiến', 'kèm bảng tổng hợp ý kiến hoặc nội dung thống nhất/đề nghị sửa đổi theo yêu cầu');
+    if (/quyết định|kiện toàn|thành lập/.test(t))
+      return explicit('Dự thảo Quyết định', 'kèm tờ trình, danh sách hoặc hồ sơ liên quan theo quy trình và thẩm quyền');
+    if (/hội nghị|tập huấn|quán triệt/.test(t))
+      return '[ĐỀ XUẤT ĐỂ LÃNH ĐẠO DUYỆT] Kế hoạch/tài liệu tổ chức; danh sách đại biểu; biên bản hoặc báo cáo kết quả sau khi hoàn thành';
+    if (/kiểm tra|giám sát/.test(t))
+      return '[ĐỀ XUẤT ĐỂ LÃNH ĐẠO DUYỆT] Kế hoạch hoặc nội dung kiểm tra; biên bản làm việc; báo cáo kết quả và kiến nghị xử lý';
+    if (/tuyên truyền|phổ biến|quán triệt/.test(t))
+      return '[ĐỀ XUẤT ĐỂ LÃNH ĐẠO DUYỆT] Nội dung/kế hoạch tuyên truyền; tài liệu hoặc sản phẩm truyền thông; báo cáo kết quả nếu được yêu cầu';
+    if (/tham mưu/.test(t))
+      return '[ĐỀ XUẤT ĐỂ LÃNH ĐẠO DUYỆT] Dự thảo văn bản tham mưu phù hợp thẩm quyền; kèm tài liệu, bảng tổng hợp hoặc hồ sơ làm căn cứ';
+    return '[CẦN LÃNH ĐẠO XÁC ĐỊNH] Chốt rõ loại sản phẩm chính, tài liệu kèm theo, đơn vị nhận và thời hạn hoàn thành';
+  }
+
+  function communeImplementationFor(task) {
+    const t = normalizedTaskText(task);
+    const steps = ['Đối chiếu yêu cầu và xác định đơn vị/cá nhân thuộc phạm vi cấp xã'];
+    if (/rà soát|thống kê|danh sách/.test(t)) steps.push('Tổ chức rà soát, thu thập số liệu và lập danh sách/bảng tổng hợp');
+    if (/kế hoạch|triển khai|thực hiện/.test(t)) steps.push('Tham mưu văn bản triển khai, phân rõ chủ trì, phối hợp và tiến độ');
+    if (/báo cáo/.test(t)) steps.push('Tổng hợp kết quả theo đề cương/biểu mẫu và kiểm tra số liệu trước khi trình');
+    if (/xin ý kiến|lấy ý kiến|góp ý/.test(t)) steps.push('Lấy ý kiến đơn vị liên quan và tổng hợp nội dung tiếp thu/giải trình');
+    if (/hội nghị|tập huấn|quán triệt/.test(t)) steps.push('Chuẩn bị nội dung, thành phần, điều kiện tổ chức và tài liệu phục vụ');
+    steps.push('Trình lãnh đạo duyệt; ban hành/gửi đúng nơi nhận và cập nhật kết quả hoàn thành');
+    return steps.map((s, i) => `${i + 1}. ${s}`).join(' ');
+  }
+
+  function installAIAssignEnhancement() {
+    if (window.__ttCommuneAdviceInstalled || typeof window.analyzeAIDocument !== 'function' || typeof window.renderAIProposals !== 'function') return;
+    window.__ttCommuneAdviceInstalled = true;
+    const baseAnalyze = window.analyzeAIDocument;
+    const baseRender = window.renderAIProposals;
+
+    window.analyzeAIDocument = function () {
+      baseAnalyze();
+      if (typeof AI_PROPOSALS !== 'undefined') {
+        AI_PROPOSALS.forEach((x) => {
+          x.communeImplementation = communeImplementationFor(x.task);
+          x.product = detailedProductForCommune(x.task);
+        });
+        window.renderAIProposals();
+      }
+    };
+
+    window.renderAIProposals = function () {
+      baseRender();
+      if (typeof AI_PROPOSALS === 'undefined') return;
+      const rows = document.querySelectorAll('#aiAssignRows tr');
+      rows.forEach((row, i) => {
+        const x = AI_PROPOSALS[i];
+        if (!x) return;
+        const taskCell = row.cells[1];
+        if (taskCell && !taskCell.querySelector('.tt-commune-advice')) {
+          const box = document.createElement('div');
+          box.className = 'tt-commune-advice';
+          const label = document.createElement('b');
+          label.textContent = 'Cấp xã cần triển khai: ';
+          box.appendChild(label);
+          box.appendChild(document.createTextNode(x.communeImplementation || communeImplementationFor(x.task)));
+          taskCell.appendChild(box);
+        }
+        const productCell = row.cells[5];
+        const oldInput = productCell && productCell.querySelector('input.ai-inline-input');
+        if (oldInput) {
+          const area = document.createElement('textarea');
+          area.className = 'ai-inline-input tt-product-detail';
+          area.rows = 5;
+          area.value = x.product || '';
+          area.onchange = () => { AI_PROPOSALS[i].product = area.value; };
+          oldInput.replaceWith(area);
+          const hint = document.createElement('small');
+          hint.className = 'tt-product-hint';
+          hint.textContent = 'Lãnh đạo rà soát và chỉnh lại trước khi duyệt giao việc.';
+          productCell.appendChild(hint);
+        }
+      });
+    };
+
+    const pane = $('c-aiassign');
+    const note = pane && pane.querySelector('.ctrl-note');
+    if (note) note.innerHTML = '<b>Quy trình chuẩn:</b> Chọn văn bản đã lưu trong <b>Văn bản chỉ đạo</b> → hệ thống đọc nội dung → xác định yêu cầu đối với cấp xã → đề xuất <b>cấp xã cần triển khai thế nào</b>, người chủ trì/phối hợp, <b>kết quả/sản phẩm cụ thể</b> và thời hạn. Nội dung AI suy ra được gắn nhãn để lãnh đạo kiểm tra. <b>Chỉ sau khi lãnh đạo bấm “Duyệt & giao việc” thì nhiệm vụ mới vào Dashboard.</b>';
+  }
+
+  function init() {
+    addStyles(); addPanel(); addModal(); watchReserveArea(); installAIAssignEnhancement();
+    const extra = document.createElement('style');
+    extra.textContent = '.tt-commune-advice{margin-top:8px;padding:8px;border-left:3px solid #a82017;background:#fff7e8;color:#594b43;font-size:12px;line-height:1.45}.tt-commune-advice b{color:#8f1d15}.tt-product-detail{min-width:240px;line-height:1.35;resize:vertical}.tt-product-hint{display:block;margin-top:4px;color:#8a5b22;line-height:1.3}';
+    document.head.appendChild(extra);
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
