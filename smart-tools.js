@@ -3,6 +3,7 @@
 
   const $ = (id) => document.getElementById(id);
   const AI_URL = 'https://chatgpt.com/';
+  const mergeSelected = new Set();
 
   function addStyles() {
     const style = document.createElement('style');
@@ -13,6 +14,7 @@
       .tt-smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.tt-smart-card{border:1px solid #ead3c3;border-radius:14px;padding:16px;background:#fff;cursor:pointer;transition:.2s;display:flex;gap:13px;align-items:flex-start}.tt-smart-card:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(120,30,20,.12);border-color:#c64232}.tt-smart-icon{width:48px;height:48px;min-width:48px;border-radius:13px;background:#a82017;color:#ffe56c;display:flex;align-items:center;justify-content:center;font-size:24px}.tt-smart-card b{display:block;color:#8f1d15;font-size:16px;margin-bottom:6px}.tt-smart-card p{margin:0;color:#615956;line-height:1.45;font-size:13px}.tt-smart-card span{display:inline-block;margin-top:8px;color:#a82017;font-weight:700;font-size:13px}
       .tt-reserve-area{border:2px dashed #a82017!important;background:linear-gradient(135deg,#fff8e8,#fff)!important}.tt-reserve-area b{color:#8f1d15!important}.tt-reserve-area small{color:#765f54!important}
       .tt-tool-overlay{position:fixed;inset:0;background:rgba(35,8,6,.68);z-index:2147482500;display:none;align-items:center;justify-content:center;padding:18px}.tt-tool-modal{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;border:2px solid #d8aa39;box-shadow:0 24px 70px rgba(0,0,0,.32);color:#302724}.tt-tool-title{padding:16px 18px;background:linear-gradient(135deg,#981b15,#c42b20);color:#fff;display:flex;justify-content:space-between;align-items:center}.tt-tool-title h3{margin:0;font-size:20px}.tt-tool-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:8px;width:34px;height:34px;font-size:20px;cursor:pointer}.tt-tool-body{padding:18px}.tt-tool-note{background:#fff7e8;border-left:4px solid #d6a325;padding:10px 12px;margin-bottom:14px;border-radius:7px;font-size:13px;line-height:1.45}.tt-tool-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tt-tool-form label{display:block;font-weight:700;color:#6f1a15;font-size:13px}.tt-tool-form input,.tt-tool-form select,.tt-tool-form textarea{box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #d9c8bd;border-radius:8px;font:14px Segoe UI,Arial;background:#fff}.tt-tool-form .full{grid-column:1/-1}.tt-tool-files{font-size:12px;color:#6d625d;margin-top:5px}.tt-tool-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}.tt-tool-actions button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.tt-tool-secondary{background:#f0e5dd;color:#7c2018}.tt-tool-primary{background:#a82017;color:#fff}
+      .tt-lookup-box{margin-top:6px;border:1px solid #d9c8bd;border-radius:9px;background:#fff;overflow:hidden}.tt-lookup-search{border:0!important;border-bottom:1px solid #eadfd7!important;border-radius:0!important;margin:0!important}.tt-lookup-list{max-height:230px;overflow:auto;padding:5px}.tt-lookup-item{display:grid!important;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:9px!important;border-bottom:1px solid #f1e7df;color:#403531!important;font-weight:400!important;cursor:pointer}.tt-lookup-item:last-child{border-bottom:0}.tt-lookup-item input{width:auto!important;margin:3px 0 0!important}.tt-lookup-item b{display:block;color:#7d1c15;font-size:13px}.tt-lookup-item small{display:block;margin-top:3px;color:#716762;line-height:1.35}.tt-lookup-empty{padding:14px;text-align:center;color:#766c67;font-size:13px}.tt-lookup-count{padding:7px 10px;background:#fff8eb;color:#7d1c15;font-size:12px;font-weight:700}
       @media(max-width:720px){.tt-smart-grid,.tt-tool-form{grid-template-columns:1fr}.tt-tool-form .full{grid-column:auto}}
     `;
     document.head.appendChild(style);
@@ -68,6 +70,46 @@
     $(outputId).textContent = names.length ? names.join(' • ') : 'Chưa chọn tệp.';
   }
 
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  function mergeLookupDocs() {
+    const docs = [];
+    const directives = (window.CTRL && Array.isArray(CTRL.directives)) ? CTRL.directives : [];
+    directives.forEach((d) => {
+      if (!d.file) return;
+      docs.push({ key: `in:${d.id}`, source: 'in', id: d.id, area: d.area || 'Chưa phân lĩnh vực', no: d.no || d.number || d.code || '', date: d.date || '', title: d.title || d.subject || d.summary || 'Văn bản đến', file: d.file });
+    });
+    const works = (window.CTRL && Array.isArray(CTRL.work)) ? CTRL.work : [];
+    works.forEach((w) => {
+      if (!w.outputFile || (typeof window.isIssuedWorkDocument === 'function' && !window.isIssuedWorkDocument(w))) return;
+      docs.push({ key: `out:${w.id}`, source: 'out', id: w.id, area: w.area || 'Chưa phân lĩnh vực', no: w.outNo || '', date: w.outDate || '', title: w.outTitle || w.task || 'Văn bản đi', file: w.outputFile });
+    });
+    const notices = (window.CTRL && Array.isArray(CTRL.meetingNotices)) ? CTRL.meetingNotices : [];
+    notices.forEach((n) => {
+      if (!n.signedFile) return;
+      docs.push({ key: `meeting:${n.id}`, source: 'meeting', id: n.id, area: 'Thông báo kết luận', no: n.no || '', date: n.issueDate || n.date || '', title: 'Thông báo kết luận cuộc họp', file: n.signedFile });
+    });
+    return docs.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  function renderMergeLookup(filter) {
+    const list = $('ttMergeLookupList');
+    if (!list) return;
+    const q = String(filter || '').trim().toLowerCase();
+    const docs = mergeLookupDocs().filter((d) => !q || [d.no, d.date, d.title, d.area, d.file].join(' ').toLowerCase().includes(q));
+    list.innerHTML = docs.length ? docs.map((d) => `<label class="tt-lookup-item"><input type="checkbox" class="tt-merge-saved" value="${esc(d.key)}"${mergeSelected.has(d.key) ? ' checked' : ''}><span><b>${d.source === 'in' ? '📥 Văn bản đến' : '📤 Văn bản đi'}${d.no ? ` · ${esc(d.no)}` : ''}${d.date ? ` · ${esc(d.date)}` : ''}</b><small>${esc(d.title)}<br>${esc(d.file)} · ${esc(d.area)}</small></span></label>`).join('') : '<div class="tt-lookup-empty">Chưa có tệp phù hợp trong Tra cứu văn bản.</div>';
+    list.querySelectorAll('.tt-merge-saved').forEach((box) => { box.onchange = () => { if (box.checked) mergeSelected.add(box.value); else mergeSelected.delete(box.value); updateMergeCount(); }; });
+    updateMergeCount();
+  }
+
+  function updateMergeCount() {
+    const saved = mergeSelected.size;
+    const local = Array.from($('ttMergeFiles')?.files || []).length;
+    if ($('ttMergeCount')) $('ttMergeCount').textContent = `Đã chọn ${saved} văn bản từ hệ thống${local ? ` và ${local} tệp bổ sung từ máy` : ''}.`;
+  }
+
   function openTool(type) {
     addModal();
     $('ttToolOverlay').style.display = 'flex';
@@ -86,16 +128,22 @@
       $('ttReserveFiles').onchange = (e) => fileNames(e.target, 'ttReserveNames');
       $('ttRun').onclick = runReserve;
     } else if (type === 'merge') {
+      mergeSelected.clear();
       $('ttToolTitle').textContent = '📚 Tham mưu hợp nhất nhiều văn bản';
       $('ttToolBody').innerHTML = `
         <div class="tt-tool-note"><b>Cách sử dụng:</b> Chọn các văn bản cùng một lĩnh vực. Trung tâm sẽ chuẩn bị câu lệnh chuẩn; sau khi ChatGPT mở, tải đúng các tệp đã chọn rồi dán câu lệnh. AI chỉ dự thảo, cán bộ kiểm tra trước khi trình ký.</div>
         <div class="tt-tool-form">
           <label>Lĩnh vực<select id="ttMergeArea"><option>Công tác tổ chức cán bộ</option><option>Đánh giá, xếp loại cán bộ</option><option>Quy hoạch cán bộ</option><option>Phân cấp quản lý cán bộ</option><option>Công tác đảng viên</option><option>Tuyên giáo, dân vận</option><option>Khác</option></select></label>
           <label>Văn bản xã dự kiến ban hành<select id="ttMergeType"><option>Kế hoạch</option><option>Công văn triển khai</option><option>Hướng dẫn</option><option>Quyết định</option><option>Báo cáo</option><option>Văn bản khác</option></select></label>
-          <label class="full">Chọn ít nhất 02 văn bản cùng lĩnh vực<input id="ttMergeFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx"><div id="ttMergeNames" class="tt-tool-files">Chưa chọn tệp.</div></label>
+          <label class="full">Chọn từ Tra cứu văn bản (có thể chọn nhiều)
+            <div class="tt-lookup-box"><input id="ttMergeLookupSearch" class="tt-lookup-search" placeholder="Tìm theo số, ngày, trích yếu, lĩnh vực hoặc tên tệp..."><div id="ttMergeLookupList" class="tt-lookup-list"></div><div id="ttMergeCount" class="tt-lookup-count">Đã chọn 0 văn bản từ hệ thống.</div></div>
+          </label>
+          <label class="full">Bổ sung văn bản chưa có trong hệ thống (không bắt buộc)<input id="ttMergeFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx"><div id="ttMergeNames" class="tt-tool-files">Chưa chọn tệp bổ sung.</div></label>
           <label class="full">Yêu cầu của lãnh đạo (nếu có)<textarea id="ttMergeNote" rows="3" placeholder="Ví dụ: Chỉ ban hành 01 kế hoạch chung; phân rõ nhiệm vụ từng cơ quan..."></textarea></label>
         </div><div class="tt-tool-actions"><button id="ttCancel" class="tt-tool-secondary">Đóng</button><button id="ttRun" class="tt-tool-primary">📋 Sao chép câu lệnh & mở ChatGPT</button></div>`;
-      $('ttMergeFiles').onchange = (e) => fileNames(e.target, 'ttMergeNames');
+      renderMergeLookup('');
+      $('ttMergeLookupSearch').oninput = (e) => renderMergeLookup(e.target.value);
+      $('ttMergeFiles').onchange = (e) => { fileNames(e.target, 'ttMergeNames'); updateMergeCount(); };
       $('ttRun').onclick = runMerge;
     } else {
       $('ttToolTitle').textContent = '🎨 Tạo ảnh tuyên truyền từ văn bản';
@@ -117,19 +165,45 @@
 
   function closeTool() { $('ttToolOverlay').style.display = 'none'; }
 
-  function copyAndOpen(text) {
+  function copyAndOpen(text, message) {
     if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
     window.open(AI_URL, '_blank');
-    setTimeout(() => alert('Đã sao chép câu lệnh. Hãy tải văn bản đã chọn lên ChatGPT, sau đó dán câu lệnh để thực hiện.'), 150);
+    setTimeout(() => alert(message || 'Đã sao chép câu lệnh. Hãy tải văn bản đã chọn lên ChatGPT, sau đó dán câu lệnh để thực hiện.'), 150);
   }
 
-  function runMerge() {
+  async function storedMergeFile(doc) {
+    if (typeof window.getDirectiveFileBlob !== 'function') return null;
+    const key = doc.source === 'in' ? doc.id : (doc.source === 'meeting' ? `meeting-notice-${doc.id}` : `work-${doc.id}`);
+    return window.getDirectiveFileBlob(key);
+  }
+
+  function downloadStoredBlob(rec, fallbackName) {
+    const url = URL.createObjectURL(rec.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = rec.name || fallbackName || 'van-ban';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  async function runMerge() {
     const files = Array.from($('ttMergeFiles').files || []);
-    if (files.length < 2) return alert('Hãy chọn ít nhất 02 văn bản cùng lĩnh vực.');
+    const selectedKeys = Array.from(mergeSelected);
+    const allSaved = mergeLookupDocs();
+    const saved = selectedKeys.map((key) => allSaved.find((d) => d.key === key)).filter(Boolean);
+    if (files.length + saved.length < 2) return alert('Hãy chọn tổng cộng ít nhất 02 văn bản cùng lĩnh vực từ Tra cứu văn bản hoặc từ máy.');
+    const unavailable = [];
+    for (const doc of saved) {
+      try {
+        const rec = await storedMergeFile(doc);
+        if (!rec?.blob) unavailable.push(doc.file || doc.title); else downloadStoredBlob(rec, doc.file);
+      } catch (_) { unavailable.push(doc.file || doc.title); }
+    }
+    if (unavailable.length) return alert(`Không lấy được tệp gốc của ${unavailable.length} văn bản:\n- ${unavailable.join('\n- ')}\n\nHãy mở Tra cứu văn bản, bổ sung lại tệp gốc rồi thử lại.`);
     const area = $('ttMergeArea').value;
     const type = $('ttMergeType').value;
     const note = $('ttMergeNote').value.trim();
-    const names = files.map((f, i) => `${i + 1}. ${f.name}`).join('\n');
+    const sourceNames = [...saved.map((d) => d.file || d.title), ...files.map((f) => f.name)];
+    const names = sourceNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
     copyAndOpen(`Bạn đang hỗ trợ Đảng ủy xã Thư Lâm tham mưu xử lý nhiều văn bản cùng lĩnh vực.
 
 LĨNH VỰC: ${area}
@@ -145,7 +219,7 @@ NHIỆM VỤ:
 5. Chỉ sử dụng thông tin trong tài liệu. Thiếu ghi [CẦN BỔ SUNG], mâu thuẫn ghi [CẦN KIỂM TRA]. Không tự tạo căn cứ, số liệu, tên người hoặc thời hạn.
 6. Cuối dự thảo lập mục NỘI DUNG CẦN CÁN BỘ KIỂM TRA TRƯỚC KHI TRÌNH KÝ.
 
-AI chỉ hỗ trợ tham mưu; cán bộ chịu trách nhiệm kiểm tra và quyết định văn bản chính thức.`);
+AI chỉ hỗ trợ tham mưu; cán bộ chịu trách nhiệm kiểm tra và quyết định văn bản chính thức.`, saved.length ? `Đã sao chép câu lệnh và lấy ${saved.length} tệp từ Tra cứu văn bản về thư mục Tải xuống. Khi ChatGPT mở, hãy đính kèm các tệp vừa tải${files.length ? ' cùng các tệp bổ sung đã chọn' : ''}, sau đó dán câu lệnh.` : undefined);
   }
 
   function runReserve() {
