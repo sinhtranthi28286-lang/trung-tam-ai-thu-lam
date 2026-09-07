@@ -1,0 +1,145 @@
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const AI_URL = 'https://chatgpt.com/';
+
+  function addStyles() {
+    const style = document.createElement('style');
+    style.id = 'tt-smart-tools-style';
+    style.textContent = `
+      .tt-smart-tools{margin:16px 0 4px;padding:18px;border:1px solid #ead1bf;border-radius:16px;background:linear-gradient(135deg,#fffaf5,#fff);box-shadow:0 7px 20px rgba(105,24,15,.08)}
+      .tt-smart-head{margin-bottom:12px}.tt-smart-head h3{margin:3px 0 0;color:#8f1d15;font-size:21px}.tt-smart-head p{margin:4px 0 0;color:#6b625e;font-size:13px}
+      .tt-smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.tt-smart-card{border:1px solid #ead3c3;border-radius:14px;padding:16px;background:#fff;cursor:pointer;transition:.2s;display:flex;gap:13px;align-items:flex-start}.tt-smart-card:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(120,30,20,.12);border-color:#c64232}.tt-smart-icon{width:48px;height:48px;min-width:48px;border-radius:13px;background:#a82017;color:#ffe56c;display:flex;align-items:center;justify-content:center;font-size:24px}.tt-smart-card b{display:block;color:#8f1d15;font-size:16px;margin-bottom:6px}.tt-smart-card p{margin:0;color:#615956;line-height:1.45;font-size:13px}.tt-smart-card span{display:inline-block;margin-top:8px;color:#a82017;font-weight:700;font-size:13px}
+      .tt-tool-overlay{position:fixed;inset:0;background:rgba(35,8,6,.68);z-index:2147482500;display:none;align-items:center;justify-content:center;padding:18px}.tt-tool-modal{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;border:2px solid #d8aa39;box-shadow:0 24px 70px rgba(0,0,0,.32);color:#302724}.tt-tool-title{padding:16px 18px;background:linear-gradient(135deg,#981b15,#c42b20);color:#fff;display:flex;justify-content:space-between;align-items:center}.tt-tool-title h3{margin:0;font-size:20px}.tt-tool-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:8px;width:34px;height:34px;font-size:20px;cursor:pointer}.tt-tool-body{padding:18px}.tt-tool-note{background:#fff7e8;border-left:4px solid #d6a325;padding:10px 12px;margin-bottom:14px;border-radius:7px;font-size:13px;line-height:1.45}.tt-tool-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tt-tool-form label{display:block;font-weight:700;color:#6f1a15;font-size:13px}.tt-tool-form input,.tt-tool-form select,.tt-tool-form textarea{box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #d9c8bd;border-radius:8px;font:14px Segoe UI,Arial;background:#fff}.tt-tool-form .full{grid-column:1/-1}.tt-tool-files{font-size:12px;color:#6d625d;margin-top:5px}.tt-tool-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}.tt-tool-actions button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.tt-tool-secondary{background:#f0e5dd;color:#7c2018}.tt-tool-primary{background:#a82017;color:#fff}
+      @media(max-width:720px){.tt-smart-grid,.tt-tool-form{grid-template-columns:1fr}.tt-tool-form .full{grid-column:auto}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function addPanel() {
+    const ai = $('aiwork');
+    if (!ai || document.querySelector('.tt-smart-tools')) return;
+    const panel = document.createElement('div');
+    panel.className = 'tt-smart-tools';
+    panel.innerHTML = `
+      <div class="tt-smart-head"><div class="tt-kicker">TIỆN ÍCH AI CHUYÊN SÂU</div><h3>ĐỌC - HỢP NHẤT - TRUYỀN THÔNG VĂN BẢN</h3><p>Hai quy trình hỗ trợ tham mưu và chuyển nội dung văn bản thành sản phẩm dễ sử dụng.</p></div>
+      <div class="tt-smart-grid">
+        <div class="tt-smart-card" data-tool="merge"><div class="tt-smart-icon">📚</div><div><b>Tham mưu hợp nhất nhiều văn bản</b><p>Đọc nhiều văn bản cùng lĩnh vực, loại trùng lặp và dự thảo một văn bản triển khai chung của xã.</p><span>Mở quy trình →</span></div></div>
+        <div class="tt-smart-card" data-tool="image"><div class="tt-smart-icon">🎨</div><div><b>Tạo ảnh tuyên truyền từ văn bản</b><p>Rút nội dung cốt lõi và tạo infographic phục vụ tuyên truyền hoặc trình bày.</p><span>Mở quy trình →</span></div></div>
+      </div>`;
+    const head = ai.querySelector('.tt-ai-big');
+    if (head) head.insertAdjacentElement('afterend', panel); else ai.prepend(panel);
+    panel.querySelector('[data-tool="merge"]').onclick = () => openTool('merge');
+    panel.querySelector('[data-tool="image"]').onclick = () => openTool('image');
+  }
+
+  function addModal() {
+    if ($('ttToolOverlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'ttToolOverlay';
+    overlay.className = 'tt-tool-overlay';
+    overlay.innerHTML = '<div class="tt-tool-modal"><div class="tt-tool-title"><h3 id="ttToolTitle">Tiện ích AI</h3><button id="ttToolClose" class="tt-tool-close">×</button></div><div id="ttToolBody" class="tt-tool-body"></div></div>';
+    overlay.onclick = (e) => { if (e.target === overlay) closeTool(); };
+    document.body.appendChild(overlay);
+    $('ttToolClose').onclick = closeTool;
+  }
+
+  function fileNames(input, outputId) {
+    const names = Array.from(input.files || []).map((f) => f.name);
+    $(outputId).textContent = names.length ? names.join(' • ') : 'Chưa chọn tệp.';
+  }
+
+  function openTool(type) {
+    addModal();
+    $('ttToolOverlay').style.display = 'flex';
+    if (type === 'merge') {
+      $('ttToolTitle').textContent = '📚 Tham mưu hợp nhất nhiều văn bản';
+      $('ttToolBody').innerHTML = `
+        <div class="tt-tool-note"><b>Cách sử dụng:</b> Chọn các văn bản cùng một lĩnh vực. Trung tâm sẽ chuẩn bị câu lệnh chuẩn; sau khi ChatGPT mở, tải đúng các tệp đã chọn rồi dán câu lệnh. AI chỉ dự thảo, cán bộ kiểm tra trước khi trình ký.</div>
+        <div class="tt-tool-form">
+          <label>Lĩnh vực<select id="ttMergeArea"><option>Công tác tổ chức cán bộ</option><option>Đánh giá, xếp loại cán bộ</option><option>Quy hoạch cán bộ</option><option>Phân cấp quản lý cán bộ</option><option>Công tác đảng viên</option><option>Tuyên giáo, dân vận</option><option>Khác</option></select></label>
+          <label>Văn bản xã dự kiến ban hành<select id="ttMergeType"><option>Kế hoạch</option><option>Công văn triển khai</option><option>Hướng dẫn</option><option>Quyết định</option><option>Báo cáo</option><option>Văn bản khác</option></select></label>
+          <label class="full">Chọn ít nhất 02 văn bản cùng lĩnh vực<input id="ttMergeFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx"><div id="ttMergeNames" class="tt-tool-files">Chưa chọn tệp.</div></label>
+          <label class="full">Yêu cầu của lãnh đạo (nếu có)<textarea id="ttMergeNote" rows="3" placeholder="Ví dụ: Chỉ ban hành 01 kế hoạch chung; phân rõ nhiệm vụ từng cơ quan..."></textarea></label>
+        </div><div class="tt-tool-actions"><button id="ttCancel" class="tt-tool-secondary">Đóng</button><button id="ttRun" class="tt-tool-primary">📋 Sao chép câu lệnh & mở ChatGPT</button></div>`;
+      $('ttMergeFiles').onchange = (e) => fileNames(e.target, 'ttMergeNames');
+      $('ttRun').onclick = runMerge;
+    } else {
+      $('ttToolTitle').textContent = '🎨 Tạo ảnh tuyên truyền từ văn bản';
+      $('ttToolBody').innerHTML = `
+        <div class="tt-tool-note"><b>Cách sử dụng:</b> Chọn văn bản nguồn. AI tóm tắt nội dung để cán bộ duyệt trước, sau đó mới tạo ảnh; không tự thêm số liệu, thời gian hoặc căn cứ.</div>
+        <div class="tt-tool-form">
+          <label>Mục đích<select id="ttImgPurpose"><option>Infographic tuyên truyền</option><option>Ảnh trình bày tại hội nghị</option><option>Ảnh thông báo nội bộ</option><option>Ảnh đăng mạng xã hội</option></select></label>
+          <label>Đối tượng<select id="ttImgAudience"><option>Cán bộ, đảng viên</option><option>Cấp ủy, tổ chức đảng</option><option>Nhân dân</option><option>Cán bộ chuyên môn</option></select></label>
+          <label class="full">Chọn văn bản mới<input id="ttImgFile" type="file" accept=".pdf,.doc,.docx"><div id="ttImgName" class="tt-tool-files">Chưa chọn tệp.</div></label>
+          <label>Khổ ảnh<select id="ttImgSize"><option>Dọc - infographic</option><option>Ngang - màn hình trình chiếu</option><option>Vuông - mạng xã hội</option></select></label>
+          <label>Phong cách<select id="ttImgStyle"><option>Trang trọng, hiện đại, màu đỏ - vàng</option><option>Hành chính, rõ ràng, ít trang trí</option><option>Trực quan, dễ đọc, nhiều biểu tượng</option></select></label>
+          <label class="full">Nội dung cần nhấn mạnh (nếu có)<textarea id="ttImgNote" rows="3" placeholder="Ví dụ: thời gian, đối tượng, nhiệm vụ trọng tâm..."></textarea></label>
+        </div><div class="tt-tool-actions"><button id="ttCancel" class="tt-tool-secondary">Đóng</button><button id="ttRun" class="tt-tool-primary">🎨 Sao chép câu lệnh & mở ChatGPT</button></div>`;
+      $('ttImgFile').onchange = (e) => fileNames(e.target, 'ttImgName');
+      $('ttRun').onclick = runImage;
+    }
+    $('ttCancel').onclick = closeTool;
+  }
+
+  function closeTool() { $('ttToolOverlay').style.display = 'none'; }
+
+  function copyAndOpen(text) {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    window.open(AI_URL, '_blank');
+    setTimeout(() => alert('Đã sao chép câu lệnh. Hãy tải văn bản đã chọn lên ChatGPT, sau đó dán câu lệnh để thực hiện.'), 150);
+  }
+
+  function runMerge() {
+    const files = Array.from($('ttMergeFiles').files || []);
+    if (files.length < 2) return alert('Hãy chọn ít nhất 02 văn bản cùng lĩnh vực.');
+    const area = $('ttMergeArea').value;
+    const type = $('ttMergeType').value;
+    const note = $('ttMergeNote').value.trim();
+    const names = files.map((f, i) => `${i + 1}. ${f.name}`).join('\n');
+    copyAndOpen(`Bạn đang hỗ trợ Đảng ủy xã Thư Lâm tham mưu xử lý nhiều văn bản cùng lĩnh vực.
+
+LĨNH VỰC: ${area}
+VĂN BẢN XÃ DỰ KIẾN BAN HÀNH: ${type}
+CÁC TỆP NGUỒN:
+${names}
+${note ? `YÊU CẦU CỦA LÃNH ĐẠO: ${note}\n` : ''}
+NHIỆM VỤ:
+1. Đọc toàn bộ văn bản và lập bảng đối chiếu: cơ quan ban hành, số ký hiệu, ngày, phạm vi, nhiệm vụ, thời hạn, đối tượng thực hiện.
+2. Xác định nội dung trùng lặp, nội dung bổ sung và điểm chưa thống nhất; không tự suy đoán.
+3. Đề xuất phương án ban hành 01 văn bản chung của xã để triển khai đồng bộ, tránh nhiều văn bản rời.
+4. Soạn dự thảo ${type} ngắn gọn, đúng thẩm quyền; phân rõ chủ trì, phối hợp, sản phẩm và thời hạn khi nguồn có quy định.
+5. Chỉ sử dụng thông tin trong tài liệu. Thiếu ghi [CẦN BỔ SUNG], mâu thuẫn ghi [CẦN KIỂM TRA]. Không tự tạo căn cứ, số liệu, tên người hoặc thời hạn.
+6. Cuối dự thảo lập mục NỘI DUNG CẦN CÁN BỘ KIỂM TRA TRƯỚC KHI TRÌNH KÝ.
+
+AI chỉ hỗ trợ tham mưu; cán bộ chịu trách nhiệm kiểm tra và quyết định văn bản chính thức.`);
+  }
+
+  function runImage() {
+    const file = $('ttImgFile').files && $('ttImgFile').files[0];
+    if (!file) return alert('Hãy chọn văn bản nguồn.');
+    const purpose = $('ttImgPurpose').value;
+    const audience = $('ttImgAudience').value;
+    const size = $('ttImgSize').value;
+    const style = $('ttImgStyle').value;
+    const note = $('ttImgNote').value.trim();
+    copyAndOpen(`Đọc kỹ văn bản tôi tải lên: ${file.name}. Hãy tạo 01 ${purpose} phục vụ ${audience}.
+
+YÊU CẦU NỘI DUNG:
+- Chỉ lấy thông tin trong văn bản; không tự thêm số liệu, căn cứ, thời gian, địa điểm hoặc tên người.
+- Chọn tiêu đề ngắn gọn; rút 4-6 nội dung quan trọng nhất, ưu tiên đối tượng, nhiệm vụ, thời gian, cách thực hiện và yêu cầu cần nhớ.
+- Trước khi tạo ảnh, đưa bản tóm tắt chữ để tôi kiểm tra. Chỉ tạo ảnh sau khi tôi xác nhận.
+
+YÊU CẦU THIẾT KẾ:
+- Khổ ảnh: ${size}.
+- Phong cách: ${style}.
+- Tiêu đề lớn, các khối nội dung rõ, màu sắc trang trọng; chữ tiếng Việt đầy đủ dấu, dễ đọc.
+- Không dùng logo, hình chân dung hoặc biểu tượng cơ quan nếu văn bản không yêu cầu; không chèn nội dung ngoài nguồn.
+${note ? `- Nội dung cần nhấn mạnh: ${note}.\n` : ''}
+Sau khi tôi duyệt phần chữ, hãy dùng công cụ tạo ảnh để xuất hình hoàn chỉnh, không watermark.`);
+  }
+
+  function init() { addStyles(); addPanel(); addModal(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
