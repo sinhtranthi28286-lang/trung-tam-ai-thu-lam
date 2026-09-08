@@ -4,6 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const AI_URL = 'https://chatgpt.com/';
   const mergeSelected = new Set();
+  let lookupSelectMode = false;
 
   function addStyles() {
     const style = document.createElement('style');
@@ -14,7 +15,7 @@
       .tt-smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.tt-smart-card{border:1px solid #ead3c3;border-radius:14px;padding:16px;background:#fff;cursor:pointer;transition:.2s;display:flex;gap:13px;align-items:flex-start}.tt-smart-card:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(120,30,20,.12);border-color:#c64232}.tt-smart-icon{width:48px;height:48px;min-width:48px;border-radius:13px;background:#a82017;color:#ffe56c;display:flex;align-items:center;justify-content:center;font-size:24px}.tt-smart-card b{display:block;color:#8f1d15;font-size:16px;margin-bottom:6px}.tt-smart-card p{margin:0;color:#615956;line-height:1.45;font-size:13px}.tt-smart-card span{display:inline-block;margin-top:8px;color:#a82017;font-weight:700;font-size:13px}
       .tt-reserve-area{border:2px dashed #a82017!important;background:linear-gradient(135deg,#fff8e8,#fff)!important}.tt-reserve-area b{color:#8f1d15!important}.tt-reserve-area small{color:#765f54!important}
       .tt-tool-overlay{position:fixed;inset:0;background:rgba(35,8,6,.68);z-index:2147482500;display:none;align-items:center;justify-content:center;padding:18px}.tt-tool-modal{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;border:2px solid #d8aa39;box-shadow:0 24px 70px rgba(0,0,0,.32);color:#302724}.tt-tool-title{padding:16px 18px;background:linear-gradient(135deg,#981b15,#c42b20);color:#fff;display:flex;justify-content:space-between;align-items:center}.tt-tool-title h3{margin:0;font-size:20px}.tt-tool-close{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:8px;width:34px;height:34px;font-size:20px;cursor:pointer}.tt-tool-body{padding:18px}.tt-tool-note{background:#fff7e8;border-left:4px solid #d6a325;padding:10px 12px;margin-bottom:14px;border-radius:7px;font-size:13px;line-height:1.45}.tt-tool-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tt-tool-form label{display:block;font-weight:700;color:#6f1a15;font-size:13px}.tt-tool-form input,.tt-tool-form select,.tt-tool-form textarea{box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #d9c8bd;border-radius:8px;font:14px Segoe UI,Arial;background:#fff}.tt-tool-form .full{grid-column:1/-1}.tt-tool-files{font-size:12px;color:#6d625d;margin-top:5px}.tt-tool-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}.tt-tool-actions button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.tt-tool-secondary{background:#f0e5dd;color:#7c2018}.tt-tool-primary{background:#a82017;color:#fff}
-      .tt-lookup-open{width:auto!important;margin-top:6px!important;padding:10px 14px;border:1px solid #bd3a2c!important;border-radius:8px!important;background:#fff7ec!important;color:#8f1d15!important;font-weight:700!important;cursor:pointer}.tt-lookup-box{display:none;margin-top:7px;border:1px solid #d9c8bd;border-radius:9px;background:#fff;overflow:hidden}.tt-lookup-box.open{display:block}.tt-lookup-search{border:0!important;border-bottom:1px solid #eadfd7!important;border-radius:0!important;margin:0!important}.tt-lookup-list{max-height:230px;overflow:auto;padding:5px}.tt-lookup-item{display:grid!important;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:9px!important;border-bottom:1px solid #f1e7df;color:#403531!important;font-weight:400!important;cursor:pointer}.tt-lookup-item:last-child{border-bottom:0}.tt-lookup-item input{width:auto!important;margin:3px 0 0!important}.tt-lookup-item b{display:block;color:#7d1c15;font-size:13px}.tt-lookup-item small{display:block;margin-top:3px;color:#716762;line-height:1.35}.tt-lookup-empty{padding:14px;text-align:center;color:#766c67;font-size:13px}.tt-lookup-count{padding:7px 10px;background:#fff8eb;color:#7d1c15;font-size:12px;font-weight:700}
+      .tt-lookup-open{width:auto!important;margin-top:6px!important;padding:10px 14px;border:1px solid #bd3a2c!important;border-radius:8px!important;background:#fff7ec!important;color:#8f1d15!important;font-weight:700!important;cursor:pointer}.tt-lookup-count{display:inline-block;margin-left:8px;padding:7px 10px;border-radius:7px;background:#fff8eb;color:#7d1c15;font-size:12px;font-weight:700}.tt-lookup-selectbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;border:2px solid #c63a29;border-radius:11px;background:#fff7df;box-shadow:0 5px 16px rgba(80,20,10,.12);color:#6f1a15}.tt-lookup-selectbar b{margin-right:auto}.tt-lookup-selectbar button,.tt-pick-doc{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer}.tt-lookup-back{background:#eee3da;color:#6f1a15}.tt-lookup-done{background:#a82017;color:#fff}.tt-pick-doc{margin-top:5px;background:#fff1d4;color:#8f1d15;border:1px solid #d6a43a}.tt-pick-doc.selected{background:#a82017;color:#fff;border-color:#a82017}
       @media(max-width:720px){.tt-smart-grid,.tt-tool-form{grid-template-columns:1fr}.tt-tool-form .full{grid-column:auto}}
     `;
     document.head.appendChild(style);
@@ -95,21 +96,73 @@
     return docs.sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
 
-  function renderMergeLookup(filter) {
-    const list = $('ttMergeLookupList');
-    if (!list) return;
-    const q = String(filter || '').trim().toLowerCase();
-    const docs = mergeLookupDocs().filter((d) => !q || [d.no, d.date, d.title, d.area, d.file].join(' ').toLowerCase().includes(q));
-    list.innerHTML = docs.length ? docs.map((d) => `<label class="tt-lookup-item"><input type="checkbox" class="tt-merge-saved" value="${esc(d.key)}"${mergeSelected.has(d.key) ? ' checked' : ''}><span><b>${d.source === 'in' ? '📥 Văn bản đến' : '📤 Văn bản đi'}${d.no ? ` · ${esc(d.no)}` : ''}${d.date ? ` · ${esc(d.date)}` : ''}</b><small>${esc(d.title)}<br>${esc(d.file)} · ${esc(d.area)}</small></span></label>`).join('') : '<div class="tt-lookup-empty">Chưa có tệp phù hợp trong Tra cứu văn bản.</div>';
-    list.querySelectorAll('.tt-merge-saved').forEach((box) => { box.onchange = () => { if (box.checked) mergeSelected.add(box.value); else mergeSelected.delete(box.value); updateMergeCount(); }; });
-    updateMergeCount();
-  }
-
   function updateMergeCount() {
     const saved = mergeSelected.size;
     const local = Array.from($('ttMergeFiles')?.files || []).length;
     if ($('ttMergeCount')) $('ttMergeCount').textContent = `Đã chọn ${saved} văn bản từ hệ thống${local ? ` và ${local} tệp bổ sung từ máy` : ''}.`;
-    if ($('ttMergeLookupOpen')) $('ttMergeLookupOpen').textContent = saved ? `📁 Đã chọn ${saved} văn bản từ Tra cứu` : '📁 Chọn văn bản từ Tra cứu';
+    if ($('ttMergeLookupOpen')) $('ttMergeLookupOpen').textContent = saved ? `📁 Mở kho Tra cứu (${saved} văn bản đã chọn)` : '📁 Mở kho Tra cứu văn bản để chọn';
+    if ($('ttLookupSelectCount')) $('ttLookupSelectCount').textContent = `${saved} văn bản đã chọn`;
+    if ($('ttLookupDone')) $('ttLookupDone').textContent = `✓ Đưa ${saved} văn bản vào tham mưu hợp nhất`;
+  }
+
+  function filteredLookupDocs() {
+    if (typeof window.dlAllDocs !== 'function') return [];
+    const q = String($('dlSearch')?.value || '').toLowerCase().trim();
+    const type = $('dlType')?.value || '', area = $('dlArea')?.value || '', period = $('dlPeriod')?.value || '';
+    return window.dlAllDocs().filter((d) => (!type || d.type === type) && (!area || d.area === area) && (!period || (typeof window.dlInPeriod === 'function' && window.dlInPeriod(d, period))) && (!q || [d.no,d.title,d.area,d.actor,d.date,d.file].join(' ').toLowerCase().includes(q))).sort((a,b) => (b.updatedAt || b.date || '').localeCompare(a.updatedAt || a.date || ''));
+  }
+
+  function lookupKey(d) {
+    return d.type === 'in' ? `in:${d.id}` : (d.source === 'meeting' ? `meeting:${d.id}` : `out:${d.id}`);
+  }
+
+  function enhanceLookupForMerge() {
+    if (!lookupSelectMode || !$('dlBody')) return;
+    const available = new Set(mergeLookupDocs().map((d) => d.key));
+    const docs = filteredLookupDocs();
+    Array.from($('dlBody').rows || []).forEach((row, i) => {
+      const d = docs[i], cell = row.cells[row.cells.length - 1];
+      if (!d || !cell) return;
+      const key = lookupKey(d);
+      if (!available.has(key)) return;
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = `tt-pick-doc${mergeSelected.has(key) ? ' selected' : ''}`;
+      button.textContent = mergeSelected.has(key) ? '☑ Đã chọn' : '☐ Chọn văn bản';
+      button.onclick = () => { if (mergeSelected.has(key)) mergeSelected.delete(key); else mergeSelected.add(key); window.renderDocumentLookup(); updateMergeCount(); };
+      cell.appendChild(button);
+    });
+  }
+
+  function installLookupSelection() {
+    if (window.__ttLookupSelectionInstalled || typeof window.renderDocumentLookup !== 'function') return;
+    window.__ttLookupSelectionInstalled = true;
+    const baseRender = window.renderDocumentLookup;
+    window.renderDocumentLookup = function () { baseRender(); enhanceLookupForMerge(); };
+  }
+
+  function openLookupSelection() {
+    lookupSelectMode = true;
+    $('ttToolOverlay').style.display = 'none';
+    const pageButton = document.querySelector('.tt-left-item[data-page="library"]');
+    if (typeof window.showCenterPage === 'function') window.showCenterPage('library', pageButton);
+    const page = $('libraryTop');
+    let bar = $('ttLookupSelectBar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'ttLookupSelectBar'; bar.className = 'tt-lookup-selectbar';
+      bar.innerHTML = '<b>📁 Chọn các tệp trong Kho Tra cứu văn bản</b><span id="ttLookupSelectCount">0 văn bản đã chọn</span><button id="ttLookupCancel" class="tt-lookup-back">← Quay lại</button><button id="ttLookupDone" class="tt-lookup-done">✓ Đưa văn bản vào tham mưu hợp nhất</button>';
+      page.insertBefore(bar, page.children[1] || page.firstChild);
+      $('ttLookupCancel').onclick = finishLookupSelection;
+      $('ttLookupDone').onclick = finishLookupSelection;
+    }
+    bar.style.display = 'flex';
+    window.renderDocumentLookup(); updateMergeCount();
+  }
+
+  function finishLookupSelection() {
+    lookupSelectMode = false;
+    if ($('ttLookupSelectBar')) $('ttLookupSelectBar').style.display = 'none';
+    $('ttToolOverlay').style.display = 'flex';
+    updateMergeCount();
   }
 
   function openTool(type) {
@@ -137,16 +190,13 @@
         <div class="tt-tool-form">
           <label>Lĩnh vực<select id="ttMergeArea"><option>Công tác tổ chức cán bộ</option><option>Đánh giá, xếp loại cán bộ</option><option>Quy hoạch cán bộ</option><option>Phân cấp quản lý cán bộ</option><option>Công tác đảng viên</option><option>Tuyên giáo, dân vận</option><option>Khác</option></select></label>
           <label>Văn bản xã dự kiến ban hành<select id="ttMergeType"><option>Kế hoạch</option><option>Công văn triển khai</option><option>Hướng dẫn</option><option>Quyết định</option><option>Báo cáo</option><option>Văn bản khác</option></select></label>
-          <label class="full">Văn bản nguồn
-            <button id="ttMergeLookupOpen" type="button" class="tt-lookup-open">📁 Chọn văn bản từ Tra cứu</button>
-            <div id="ttMergeLookupBox" class="tt-lookup-box"><input id="ttMergeLookupSearch" class="tt-lookup-search" placeholder="Tìm theo số, ngày, trích yếu, lĩnh vực hoặc tên tệp..."><div id="ttMergeLookupList" class="tt-lookup-list"></div><div id="ttMergeCount" class="tt-lookup-count">Đã chọn 0 văn bản từ hệ thống.</div></div>
+          <label class="full">Văn bản nguồn<br>
+            <button id="ttMergeLookupOpen" type="button" class="tt-lookup-open">📁 Mở kho Tra cứu văn bản để chọn</button><span id="ttMergeCount" class="tt-lookup-count">Đã chọn 0 văn bản từ hệ thống.</span>
           </label>
           <label class="full">Bổ sung văn bản chưa có trong hệ thống (không bắt buộc)<input id="ttMergeFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx"><div id="ttMergeNames" class="tt-tool-files">Chưa chọn tệp bổ sung.</div></label>
           <label class="full">Yêu cầu của lãnh đạo (nếu có)<textarea id="ttMergeNote" rows="3" placeholder="Ví dụ: Chỉ ban hành 01 kế hoạch chung; phân rõ nhiệm vụ từng cơ quan..."></textarea></label>
         </div><div class="tt-tool-actions"><button id="ttCancel" class="tt-tool-secondary">Đóng</button><button id="ttRun" class="tt-tool-primary">📋 Sao chép câu lệnh & mở ChatGPT</button></div>`;
-      renderMergeLookup('');
-      $('ttMergeLookupOpen').onclick = () => { $('ttMergeLookupBox').classList.toggle('open'); if ($('ttMergeLookupBox').classList.contains('open')) $('ttMergeLookupSearch').focus(); };
-      $('ttMergeLookupSearch').oninput = (e) => renderMergeLookup(e.target.value);
+      $('ttMergeLookupOpen').onclick = openLookupSelection;
       $('ttMergeFiles').onchange = (e) => { fileNames(e.target, 'ttMergeNames'); updateMergeCount(); };
       $('ttRun').onclick = runMerge;
     } else {
@@ -392,7 +442,7 @@ Sau khi tôi duyệt phần chữ, hãy dùng công cụ tạo ảnh để xuấ
   }
 
   function init() {
-    addStyles(); addPanel(); addModal(); watchReserveArea(); installAIAssignEnhancement();
+    addStyles(); addPanel(); addModal(); watchReserveArea(); installAIAssignEnhancement(); installLookupSelection();
     const extra = document.createElement('style');
     extra.textContent = '.tt-commune-advice{margin-top:8px;padding:8px;border-left:3px solid #a82017;background:#fff7e8;color:#594b43;font-size:12px;line-height:1.45}.tt-commune-advice b{color:#8f1d15}.tt-product-detail{min-width:240px;line-height:1.35;resize:vertical}.tt-product-hint{display:block;margin-top:4px;color:#8a5b22;line-height:1.3}';
     document.head.appendChild(extra);
