@@ -19,16 +19,16 @@
       }
     } catch (_) {}
 
-    if (window.__ttLocalLoginFirst || typeof window.unlockApp !== 'function') return;
+    if (window.__ttLocalLoginFirst || typeof unlockApp !== 'function') return;
     window.__ttLocalLoginFirst = true;
-    const originalUnlock = window.unlockApp;
-    window.unlockApp = async function () {
+    const originalUnlock = unlockApp;
+    unlockApp = async function () {
       const username = (document.getElementById('lockUsername')?.value || '').trim();
       const password = document.getElementById('lockPassword')?.value || '';
-      if (username && password && typeof window.tryLocalLogin === 'function') {
+      if (username && password && typeof tryLocalLogin === 'function') {
         try {
-          if (await window.tryLocalLogin(username, password)) {
-            if (typeof window.lockSetMsg === 'function') window.lockSetMsg('Đăng nhập thành công.', 'ok');
+          if (await tryLocalLogin(username, password)) {
+            if (typeof lockSetMsg === 'function') lockSetMsg('Đăng nhập thành công.', 'ok');
             return;
           }
         } catch (_) {}
