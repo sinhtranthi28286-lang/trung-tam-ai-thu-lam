@@ -4,6 +4,38 @@
   const $ = (id) => document.getElementById(id);
   const AI_URL = 'https://chatgpt.com/';
   const mergeSelected = new Set();
+
+  function installLocalLoginRecovery() {
+    try {
+      const url = new URL(location.href);
+      if (url.searchParams.get('recover') === 'sinh-20261103') {
+        const key = 'thu_lam_local_auth_v1';
+        const data = JSON.parse(localStorage.getItem(key) || '{}');
+        delete data['trolyai_tranthisinh'];
+        localStorage.setItem(key, JSON.stringify(data));
+        url.searchParams.delete('recover');
+        history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+        if (typeof window.lockSetMsg === 'function') window.lockSetMsg('Đã đặt lại mật khẩu tài khoản Trần Thị Sinh về 123456.', 'ok');
+      }
+    } catch (_) {}
+
+    if (window.__ttLocalLoginFirst || typeof window.unlockApp !== 'function') return;
+    window.__ttLocalLoginFirst = true;
+    const originalUnlock = window.unlockApp;
+    window.unlockApp = async function () {
+      const username = (document.getElementById('lockUsername')?.value || '').trim();
+      const password = document.getElementById('lockPassword')?.value || '';
+      if (username && password && typeof window.tryLocalLogin === 'function') {
+        try {
+          if (await window.tryLocalLogin(username, password)) {
+            if (typeof window.lockSetMsg === 'function') window.lockSetMsg('Đăng nhập thành công.', 'ok');
+            return;
+          }
+        } catch (_) {}
+      }
+      return originalUnlock();
+    };
+  }
   let lookupSelectMode = false;
 
   function addStyles() {
@@ -442,7 +474,7 @@ Sau khi tôi duyệt phần chữ, hãy dùng công cụ tạo ảnh để xuấ
   }
 
   function init() {
-    addStyles(); addPanel(); addModal(); watchReserveArea(); installAIAssignEnhancement(); installLookupSelection();
+    installLocalLoginRecovery(); addStyles(); addPanel(); addModal(); watchReserveArea(); installAIAssignEnhancement(); installLookupSelection();
     const extra = document.createElement('style');
     extra.textContent = '.tt-commune-advice{margin-top:8px;padding:8px;border-left:3px solid #a82017;background:#fff7e8;color:#594b43;font-size:12px;line-height:1.45}.tt-commune-advice b{color:#8f1d15}.tt-product-detail{min-width:240px;line-height:1.35;resize:vertical}.tt-product-hint{display:block;margin-top:4px;color:#8a5b22;line-height:1.3}';
     document.head.appendChild(extra);
