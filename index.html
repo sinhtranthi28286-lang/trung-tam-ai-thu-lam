@@ -78,7 +78,20 @@ function vnDateV864(){
     if(SKIP.has(node.nodeName)||node.isContentEditable)return;
     const w=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let t;while((t=w.nextNode()))fixText(t);
   }
+  /* 3. Hộp hỏi ngày ban hành Thông báo kết luận: nhập ngày/tháng/năm thay cho YYYY-MM-DD */
+  function patchPrompts(){
+    if(typeof window.meetingNoticeIssueDatePrompt!=='function'||window.meetingNoticeIssueDatePrompt.__vn)return;
+    const f=function(def=''){
+      const now=new Date(),today=`${now.getFullYear()}-${two(now.getMonth()+1)}-${two(now.getDate())}`;
+      const d=/^\d{4}-\d{2}-\d{2}$/.test(def||'')?def:today;
+      const v=prompt('Nhập ngày ban hành Thông báo (ngày/tháng/năm, ví dụ 05/11/2026):',fmt(d));
+      if(v===null)return null;const t=v.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;
+      const iso=parse(t);if(iso)return iso;alert('Ngày ban hành chưa đúng. Hãy nhập theo dạng ngày/tháng/năm, ví dụ 05/11/2026.');return null;
+    };
+    f.__vn=true;window.meetingNoticeIssueDatePrompt=f;
+  }
   function start(){
+    patchPrompts();setTimeout(patchPrompts,1500);
     const css=document.createElement('style');css.id='vn-date-v864';
     css.textContent='.vn-date-wrap{position:relative;display:block;width:100%}.vn-date-wrap>.vn-date-text{width:100%;box-sizing:border-box;padding-right:38px!important}'+
       '.vn-date-wrap>.vn-date-native{position:absolute!important;right:0;bottom:0;width:36px!important;height:100%!important;opacity:0!important;pointer-events:none!important;padding:0!important;border:0!important;min-width:0!important}'+
