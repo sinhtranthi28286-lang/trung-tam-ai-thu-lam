@@ -13,6 +13,84 @@ html,body{margin:0;height:100%;font-family:Segoe UI,Arial,sans-serif;background:
 <body>
 <div id="loading"><div class="box"><div class="spinner"></div><b>Đang mở Trung tâm AI...</b><div id="msg" style="margin-top:10px;font-size:13px;opacity:.85"></div></div></div>
 <script>
+function vnDateV864(){
+  if(window.__vnDateV864)return; window.__vnDateV864=true;
+  /* 1. Chữ hiển thị: 2026-08-30 -> 30/08/2026; 2026-11 -> 11/2026; 2026-W45 -> tuần 45/2026 */
+  const RE_T=/(^|[^\w\/.\-])(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+\-]\d{2}:?\d{2})?/g;
+  const RE_D=/(^|[^\w\/.\-])(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?![\d\-])/g;
+  const RE_M=/(^|[^\w\/.\-])(\d{4})-(0[1-9]|1[0-2])(?![\d\-])/g;
+  const RE_W=/(^|[^\w\/.\-])(\d{4})-W(\d{1,2})(?!\d)/g;
+  const conv=s=>s.replace(RE_T,(m,p,y,mo,d,hm)=>`${p}${d}/${mo}/${y} ${hm}`)
+    .replace(RE_D,(m,p,y,mo,d)=>`${p}${d}/${mo}/${y}`)
+    .replace(RE_M,(m,p,y,mo)=>`${p}${mo}/${y}`)
+    .replace(RE_W,(m,p,y,w)=>`${p}tuần ${w}/${y}`);
+  window.vnDateText=conv;
+  const SKIP=new Set(['SCRIPT','STYLE','TEXTAREA','INPUT','SELECT','CODE','PRE','NOSCRIPT']);
+  function fixText(t){
+    const p=t.parentNode;if(!p||SKIP.has(p.nodeName)||p.isContentEditable)return;
+    const v=t.nodeValue;if(v&&/\d{4}-[\dW]/.test(v)){const n=conv(v);if(n!==v)t.nodeValue=n}
+  }
+  function fixOptions(root){
+    (root.matches&&root.matches('option')?[root]:root.querySelectorAll?root.querySelectorAll('option'):[]).forEach(o=>{
+      const v=o.textContent;if(/\d{4}-[\dW]/.test(v)){const n=conv(v);if(n!==v)o.textContent=n}});
+  }
+  /* 2. Ô nhập ngày: hiện ngày/tháng/năm, có nút lịch; giá trị bên trong vẫn là năm-tháng-ngày */
+  const VDESC=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  const two=n=>String(n).padStart(2,'0');
+  const fmt=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');return m?`${m[3]}/${m[2]}/${m[1]}`:''};
+  function parse(s){
+    s=String(s||'').trim();if(!s)return '';
+    let m=/^(\d{1,2})[\/.\-\s](\d{1,2})[\/.\-\s](\d{2}|\d{4})$/.exec(s)||(/^(\d{2})(\d{2})(\d{4})$/.exec(s));
+    if(!m)return null;let d=+m[1],mo=+m[2],y=+m[3];if(y<100)y+=2000;
+    const dt=new Date(y,mo-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return null;
+    return `${y}-${two(mo)}-${two(d)}`;
+  }
+  function enhance(inp){
+    if(inp.__vnDate||inp.type!=='date')return;inp.__vnDate=true;
+    const wrap=document.createElement('span');wrap.className='vn-date-wrap';
+    const txt=document.createElement('input');txt.type='text';txt.className=(inp.className||'')+' vn-date-text';
+    txt.placeholder='ngày/tháng/năm';txt.autocomplete='off';txt.inputMode='numeric';txt.setAttribute('aria-label','Ngày (ngày/tháng/năm)');
+    if(inp.getAttribute('style'))txt.setAttribute('style',inp.getAttribute('style'));
+    const btn=document.createElement('button');btn.type='button';btn.className='vn-date-btn';btn.title='Chọn ngày trên lịch';btn.textContent='📅';
+    inp.parentNode.insertBefore(wrap,inp);wrap.append(txt,inp,btn);inp.classList.add('vn-date-native');inp.tabIndex=-1;
+    const show=()=>{txt.value=fmt(VDESC.get.call(inp));txt.classList.remove('vn-date-bad');txt.disabled=inp.disabled;txt.readOnly=inp.readOnly;btn.disabled=inp.disabled||inp.readOnly};
+    Object.defineProperty(inp,'value',{configurable:true,get(){return VDESC.get.call(this)},set(v){VDESC.set.call(this,v);show()}});
+    inp.addEventListener('change',show);inp.addEventListener('input',show);
+    txt.addEventListener('input',e=>{
+      if(e.inputType&&e.inputType.startsWith('insert')){const v=txt.value;if(/^\d{2}$/.test(v)||/^\d{1,2}\/\d{2}$/.test(v))txt.value=v+'/'}
+    });
+    txt.addEventListener('change',()=>{
+      const iso=parse(txt.value);
+      if(iso===null){txt.classList.add('vn-date-bad');txt.title='Nhập ngày theo dạng ngày/tháng/năm, ví dụ 05/11/2026';return}
+      txt.classList.remove('vn-date-bad');txt.title='';
+      if(iso!==VDESC.get.call(inp)){VDESC.set.call(inp,iso);inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}
+      show();
+    });
+    btn.addEventListener('click',()=>{try{inp.showPicker()}catch(_){inp.focus()}});
+    show();
+  }
+  function scan(node){
+    if(node.nodeType===3){fixText(node);return}
+    if(node.nodeType!==1)return;
+    if(node.matches('input[type=date]'))enhance(node);
+    node.querySelectorAll&&node.querySelectorAll('input[type=date]').forEach(enhance);
+    fixOptions(node);
+    if(SKIP.has(node.nodeName)||node.isContentEditable)return;
+    const w=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let t;while((t=w.nextNode()))fixText(t);
+  }
+  function start(){
+    const css=document.createElement('style');css.id='vn-date-v864';
+    css.textContent='.vn-date-wrap{position:relative;display:block;width:100%}.vn-date-wrap>.vn-date-text{width:100%;box-sizing:border-box;padding-right:38px!important}'+
+      '.vn-date-wrap>.vn-date-native{position:absolute!important;right:0;bottom:0;width:36px!important;height:100%!important;opacity:0!important;pointer-events:none!important;padding:0!important;border:0!important;min-width:0!important}'+
+      '.vn-date-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;padding:4px}'+
+      '.vn-date-text.vn-date-bad{border-color:#c0392b!important;background:#fff5f5!important}';
+    document.head.appendChild(css);
+    scan(document.body);
+    new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')fixText(m.target);else m.addedNodes.forEach(scan)}})
+      .observe(document.body,{childList:true,subtree:true,characterData:true});
+  }
+  if(document.body)start();else document.addEventListener('DOMContentLoaded',start);
+}
 (async()=>{
   try{
     const files=[1,2,3,4,5,6,7,8,9].map(n=>'v861/part'+String(n).padStart(2,'0')+'.txt');
@@ -33,6 +111,9 @@ html,body{margin:0;height:100%;font-family:Segoe UI,Arial,sans-serif;background:
     html=html.replace(/(?:https:\/\/sinhtranthi28286-lang\.github\.io\/trung-tam-ai-thu-lam\/)?assets\/co-dang-chuan(?:-v\d+)?\.(?:png|svg)(?:\?v=\d+)?/gi,flagUrl);
     const flagCss='<style id="party-flag-stable-v858">html body img[alt="Cờ Đảng"]{display:block!important;width:100%!important;height:100%!important;object-fit:fill!important;object-position:center!important;margin:0!important;padding:0!important;background:transparent!important;image-rendering:auto!important}html body .hero .hero-left .tt-party-rect,html body .app-lock-logo{box-sizing:border-box!important;width:92px!important;min-width:92px!important;max-width:92px!important;height:58px!important;padding:0!important;border:0!important;border-radius:8px!important;box-shadow:none!important;overflow:hidden!important;background:transparent!important;flex:0 0 92px!important}</style>';
     html=html.replace('</body>',flagCss+'</body>');
+
+    /* V8.64: hiển thị và nhập ngày theo kiểu Việt Nam (ngày/tháng/năm) */
+    html=html.replace('</body>',()=>'<script>('+vnDateV864.toString()+')();<\/script></body>');
 
     try{
       const raw=localStorage.getItem('sb-uycbkcdmkxgbbdqjyqpt-auth-token');
